@@ -15,7 +15,6 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const path = takeFlag(args, '--path') ?? './edicts.yaml';
   const format = takeFlag(args, '--format') as 'yaml' | 'json' | undefined;
-  const command = args.find((arg) => !arg.startsWith('--') && !args.includes(`${arg}-value-placeholder`));
 
   const positional = args.filter((arg, index) => {
     if (arg.startsWith('--')) return false;
