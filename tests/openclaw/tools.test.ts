@@ -25,14 +25,14 @@ describe('OpenClaw edicts tools', () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, autoSave: true });
     await store.load();
-    await store.add({ text: 'Alpha fact', category: 'product' });
+    const created = await store.add({ text: 'Alpha fact', category: 'product' });
 
     const tools = createEdictsTools({ path });
     const listTool = tools.find((tool) => (tool as { name: string }).name === 'edicts_list') as { execute: (id: string, params: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }> };
     const getTool = tools.find((tool) => (tool as { name: string }).name === 'edicts_get') as { execute: (id: string, params: { id: string }) => Promise<{ content: Array<{ text: string }> }> };
 
     const listed = await listTool.execute('1', {});
-    const fetched = await getTool.execute('2', { id: 'e_001' });
+    const fetched = await getTool.execute('2', { id: created.edict?.id ?? created.id ?? '' });
 
     expect(listed.content[0].text).toContain('Alpha fact');
     expect(fetched.content[0].text).toContain('Alpha fact');

@@ -1,6 +1,6 @@
 import type { OpenClawPluginApi } from './plugin-api.js';
 import { EdictStore } from '../store.js';
-import { toStoreOptions } from './config.js';
+import { getDefaultToolNames, toStoreOptions } from './config.js';
 import { buildBeforePromptBuildResult } from './context.js';
 import { createEdictsTools } from './tools.js';
 import type { EdictsPluginConfig } from './types.js';
@@ -13,15 +13,21 @@ const edictsPlugin = {
     const pluginConfig = (api.pluginConfig ?? {}) as EdictsPluginConfig;
 
     api.registerTool(() => createEdictsTools(pluginConfig), {
-      names: ['edicts_list', 'edicts_get', 'edicts_add', 'edicts_update', 'edicts_remove', 'edicts_search', 'edicts_stats'],
+      names: getDefaultToolNames(),
       optional: pluginConfig.tools?.optional ?? true,
     });
 
     api.on('before_prompt_build', async () => {
-      const store = new EdictStore(toStoreOptions(pluginConfig));
-      await store.load();
-      const edicts = await store.all();
-      return buildBeforePromptBuildResult(edicts, pluginConfig);
+      try {
+        const store = new EdictStore(toStoreOptions(pluginConfig));
+        await store.load();
+        const edicts = await store.all();
+        return buildBeforePromptBuildResult(edicts, pluginConfig);
+      }
+      catch (error) {
+        console.warn('[edicts] Failed to build prompt context:', error);
+        return {};
+      }
     });
   },
 };

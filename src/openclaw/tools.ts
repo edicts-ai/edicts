@@ -14,9 +14,18 @@ async function withStore<T>(config: EdictsPluginConfig | undefined, fn: (store: 
   return fn(store);
 }
 
-export function createEdictsTools(config?: EdictsPluginConfig): Array<{ name: string; description: string; parameters: unknown; execute: (id: string, params?: any) => Promise<{ content: Array<{ type: 'text'; text: string }> }> }> {
+type ToolContentResult = Promise<{ content: Array<{ type: 'text'; text: string }> }>;
+
+type EdictsTool = {
+  name: string;
+  description: string;
+  parameters: unknown;
+  execute: (id: string, params?: any) => ToolContentResult;
+};
+
+export function createEdictsTools(config?: EdictsPluginConfig): EdictsTool[] {
   const names = new Set(resolveEnabledToolNames(config));
-  const tools: Array<{ name: string; description: string; parameters: unknown; execute: (id: string, params?: any) => Promise<{ content: Array<{ type: 'text'; text: string }> }> }> = [];
+  const tools: EdictsTool[] = [];
 
   if (names.has('edicts_list')) {
     tools.push({

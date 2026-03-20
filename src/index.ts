@@ -36,18 +36,9 @@ export {
   openclawPluginEdicts,
   edictsPluginConfigSchema,
   createEdictsTools,
-  buildBeforePromptBuildResult,
-  renderPromptContext,
-  selectEdictsForPrompt,
-  getDefaultToolNames,
-  normalizePluginConfig,
-  resolveEnabledToolNames,
-  toStoreOptions,
 } from './openclaw/index.js';
 
 export type {
   EdictsPluginConfig,
   EdictsToolName,
-  BeforePromptBuildResult,
-  PromptContextSelection,
 } from './openclaw/index.js';
