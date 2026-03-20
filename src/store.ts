@@ -307,7 +307,8 @@ export class EdictStore {
 
     const version =
       this._history.filter((entry) => entry.supersededBy === existing.id).length + 1;
-    const historyId = `${existing.id}__${now.replace(/[-:.TZ]/g, '')}_${String(version).padStart(3, '0')}`;
+    const ts = now.replace(/[-:.TZ]/g, '');
+    const historyId = `${existing.id}__v${String(version).padStart(3, '0')}_${ts}`;
     this._history.push({
       id: historyId,
       text: previousText,
