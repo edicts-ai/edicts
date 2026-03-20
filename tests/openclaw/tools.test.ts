@@ -32,7 +32,8 @@ describe('OpenClaw edicts tools', () => {
     const getTool = tools.find((tool) => (tool as { name: string }).name === 'edicts_get') as { execute: (id: string, params: { id: string }) => Promise<{ content: Array<{ text: string }> }> };
 
     const listed = await listTool.execute('1', {});
-    const fetched = await getTool.execute('2', { id: created.edict?.id ?? created.id ?? '' });
+    expect(created.edict?.id).toBeDefined();
+    const fetched = await getTool.execute('2', { id: created.edict!.id });
 
     expect(listed.content[0].text).toContain('Alpha fact');
     expect(fetched.content[0].text).toContain('Alpha fact');

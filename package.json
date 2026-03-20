@@ -45,8 +45,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "yaml": "^2.8.2",
-    "@sinclair/typebox": "0.34.48"
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "tsup": "^8.5.1",

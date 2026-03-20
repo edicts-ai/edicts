@@ -1,3 +1,4 @@
+// Keep this in sync with openclaw.plugin.json until plugin packaging can source a single schema artifact.
 export const edictsPluginConfigSchema = {
   type: 'object',
   additionalProperties: false,

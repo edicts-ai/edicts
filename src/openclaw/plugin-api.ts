@@ -2,6 +2,7 @@ export interface OpenClawTool {
   name: string;
   description: string;
   parameters: unknown;
+  // OpenClaw does not currently expose a stable SDK type for per-tool params in this standalone adapter.
   execute: (id: string, params: any) => Promise<{ content: Array<{ type: 'text'; text: string }> }>;
 }
 

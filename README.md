@@ -52,3 +52,8 @@ import {
   buildBeforePromptBuildResult,
 } from 'edicts';
 ```
+
+
+## OpenClaw adapter exports
+
+In addition to the primary plugin entrypoints, the OpenClaw adapter also exports supporting utilities such as `normalizePluginConfig`, `createEdictsTools`, `edictsPluginConfigSchema`, and `buildBeforePromptBuildResult` for advanced integration and testing use cases.
