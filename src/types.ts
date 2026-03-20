@@ -18,6 +18,8 @@ export interface EdictInput {
   ttl?: 'ephemeral' | 'event' | 'durable' | 'permanent';
   /** Expiration date (ISO 8601) for ephemeral/event edicts */
   expiresAt?: string;
+  /** Duration until expiry. String: '30m', '2h', '7d'. Number or numeric string: seconds. */
+  expiresIn?: string | number;
 }
 
 /**
@@ -72,6 +74,32 @@ export interface MutationResult {
   id?: string;
   edict?: Edict;
   pruned: number;
+  /** Capacity/limit warnings (informational) */
+  warnings?: string[];
+}
+
+export interface CapacityStatus {
+  countUsage: number;
+  tokenUsage: number;
+  categories: Record<string, { count: number; limit?: number; overLimit: boolean }>;
+  warnings: string[];
+}
+
+export interface CompactionGroup {
+  keyPrefix: string;
+  category: string;
+  edicts: Edict[];
+}
+
+export interface ReviewOptions {
+  expiryLookaheadDays?: number;
+}
+
+export interface ReviewResult {
+  stale: Edict[];
+  expiringSoon: Edict[];
+  capacity: CapacityStatus;
+  compactionCandidates: CompactionGroup[];
 }
 
 export interface EdictStats {
@@ -132,6 +160,16 @@ export interface EdictStoreOptions {
   categories?: string[];
   /** Custom renderer function. Overrides built-in formats */
   renderer?: Renderer;
+  /** Days before a durable edict is considered stale. Default: 90 */
+  staleThresholdDays?: number;
+  /** Per-category soft limits. e.g., { product: 30, internal: 20 } */
+  categoryLimits?: Record<string, number>;
+  /** Default soft limit for categories not explicitly listed */
+  defaultCategoryLimit?: number;
+  /** Default TTL in seconds for ephemeral edicts with no explicit expiry. Default: 86400 (24h) */
+  defaultEphemeralTtlSeconds?: number;
+  /** Auto-save after mutations and prune operations. Default: true */
+  autoSave?: boolean;
 }
 
 /**
@@ -145,6 +183,10 @@ export interface EdictFileSchema {
     maxEdicts: number;
     tokenBudget: number;
     categories: string[];
+    staleThresholdDays?: number;
+    categoryLimits?: Record<string, number>;
+    defaultCategoryLimit?: number;
+    defaultEphemeralTtlSeconds?: number;
   };
   edicts: StoredEdict[];
   history: HistoryEntry[];

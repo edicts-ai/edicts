@@ -38,6 +38,31 @@ describe('validateEdictInput', () => {
       validateEdictInput({ text: 'Hello', category: 'test', expiresAt: '2026-04-15T00:00:00Z' })
     ).not.toThrow();
   });
+
+  it('rejects both expiresAt and expiresIn', () => {
+    expect(() =>
+      validateEdictInput({
+        text: 'Test',
+        category: 'test',
+        expiresAt: '2026-04-01T00:00:00Z',
+        expiresIn: '2h',
+      })
+    ).toThrow('Cannot specify both expiresAt and expiresIn');
+  });
+
+  it('accepts expiresIn string', () => {
+    expect(() => validateEdictInput({ text: 'Test', category: 'test', expiresIn: '2h' })).not.toThrow();
+  });
+
+  it('accepts expiresIn number', () => {
+    expect(() => validateEdictInput({ text: 'Test', category: 'test', expiresIn: 3600 })).not.toThrow();
+  });
+
+  it('rejects invalid expiresIn', () => {
+    expect(() =>
+      validateEdictInput({ text: 'Test', category: 'test', expiresIn: 'banana' })
+    ).toThrow('Invalid duration');
+  });
 });
 
 describe('validateFileSchema', () => {

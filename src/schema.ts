@@ -1,5 +1,6 @@
 import type { Edict, EdictInput, EdictFileSchema, HistoryEntry } from './types.js';
 import { EdictValidationError } from './errors.js';
+import { parseDuration } from './duration.js';
 
 const VALID_CONFIDENCE = new Set(['verified', 'inferred', 'user']);
 const VALID_TTL = new Set(['ephemeral', 'event', 'durable', 'permanent']);
@@ -30,6 +31,22 @@ export function validateEdictInput(input: EdictInput): void {
     if (isNaN(parsed.getTime())) {
       throw new EdictValidationError(
         `Invalid expiresAt "${input.expiresAt}". Must be a valid ISO 8601 date.`
+      );
+    }
+  }
+
+  if (input.expiresIn !== undefined && input.expiresAt !== undefined) {
+    throw new EdictValidationError(
+      'Cannot specify both expiresAt and expiresIn. Use one or the other.'
+    );
+  }
+
+  if (input.expiresIn !== undefined) {
+    try {
+      parseDuration(input.expiresIn);
+    } catch (error) {
+      throw new EdictValidationError(
+        error instanceof Error ? error.message : 'Invalid expiresIn value.'
       );
     }
   }

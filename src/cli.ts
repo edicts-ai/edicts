@@ -36,27 +36,27 @@ async function main(): Promise<void> {
       const confidence = takeFlag(args, '--confidence') as 'verified' | 'inferred' | 'user' | undefined;
       const ttl = takeFlag(args, '--ttl') as 'ephemeral' | 'event' | 'durable' | 'permanent' | undefined;
       const expiresAt = takeFlag(args, '--expiresAt');
+      const expiresIn = takeFlag(args, '--expiresIn');
       const tags = takeFlag(args, '--tags')?.split(',').map((v) => v.trim()).filter(Boolean);
 
       if (!text || !category) {
         throw new Error('add requires --text and --category');
       }
 
-      const result = store.add({ text, category, key, source, confidence, ttl, expiresAt, tags });
-      await store.save();
+      const result = await store.add({ text, category, key, source, confidence, ttl, expiresAt, expiresIn, tags });
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       break;
     }
     case 'list': {
       if (hasFlag(args, '--json')) {
-        process.stdout.write(`${store.render('json')}\n`);
+        process.stdout.write(`${await store.render('json')}\n`);
       } else {
-        process.stdout.write(`${store.render('plain')}\n`);
+        process.stdout.write(`${await store.render('plain')}\n`);
       }
       break;
     }
     case 'stats': {
-      process.stdout.write(`${JSON.stringify(store.stats(), null, 2)}\n`);
+      process.stdout.write(`${JSON.stringify(await store.stats(), null, 2)}\n`);
       break;
     }
     default:

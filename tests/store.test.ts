@@ -18,15 +18,15 @@ afterEach(async () => {
 describe('EdictStore lifecycle', () => {
   it('creates a new file on first save', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Test edict', category: 'test' });
+    await store.add({ text: 'Test edict', category: 'test' });
     await store.save();
 
-    const store2 = new EdictStore({ path });
+    const store2 = new EdictStore({ path, autoSave: false });
     await store2.load();
-    expect(store2.all()).toHaveLength(1);
-    expect(store2.all()[0].text).toBe('Test edict');
+    expect(await store2.all()).toHaveLength(1);
+    expect(await store2.all()[0].text).toBe('Test edict');
   });
 
   it('loads existing YAML file', async () => {
@@ -49,32 +49,32 @@ edicts:
     updated: "2026-03-20T06:00:00Z"
 history: []
 `);
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    expect(store.all()).toHaveLength(1);
-    expect(store.get('existing')?.text).toBe('Pre-existing edict');
+    expect(await store.all()).toHaveLength(1);
+    expect(await store.get('existing')?.text).toBe('Pre-existing edict');
   });
 
   it('uses JSON format when extension is .json', async () => {
     const path = join(tempDir, 'edicts.json');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'JSON edict', category: 'test' });
+    await store.add({ text: 'JSON edict', category: 'test' });
     await store.save();
 
-    const store2 = new EdictStore({ path });
+    const store2 = new EdictStore({ path, autoSave: false });
     await store2.load();
-    expect(store2.all()).toHaveLength(1);
+    expect(await store2.all()).toHaveLength(1);
   });
 
   it('get returns a clone and does not expose internal mutable state', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    store.add({ text: 'Original text', category: 'test', tags: ['one'] });
+    await store.add({ text: 'Original text', category: 'test', tags: ['one'] });
 
-    const edict = store.get('e_001');
+    const edict = await store.get('e_001');
     expect(edict?.text).toBe('Original text');
 
     if (!edict) {
@@ -84,27 +84,27 @@ history: []
     edict.text = 'Mutated outside store';
     edict.tags.push('two');
 
-    const reread = store.get('e_001');
+    const reread = await store.get('e_001');
     expect(reread?.text).toBe('Original text');
     expect(reread?.tags).toEqual(['one']);
   });
 
   it('update is atomic when category validation fails after a text patch', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path, categories: ['product'] });
+    const store = new EdictStore({ path, categories: ['product'], autoSave: false });
     await store.load();
 
-    store.add({ text: 'Original text', category: 'product', tags: ['stable'] });
+    await store.add({ text: 'Original text', category: 'product', tags: ['stable'] });
 
     expect(() =>
-      store.update('e_001', {
+      await store.update('e_001', {
         text: 'New text',
         category: 'invalid-category',
         tags: ['changed'],
       })
     ).toThrow('Unknown category');
 
-    const edict = store.get('e_001');
+    const edict = await store.get('e_001');
     expect(edict).toMatchObject({
       text: 'Original text',
       category: 'product',
@@ -114,10 +114,10 @@ history: []
 
   it('dirty flag tracks unsaved changes', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
     expect(store.dirty).toBe(false);
-    store.add({ text: 'New edict', category: 'test' });
+    await store.add({ text: 'New edict', category: 'test' });
     expect(store.dirty).toBe(true);
     await store.save();
     expect(store.dirty).toBe(false);
@@ -125,14 +125,14 @@ history: []
 
   it('respects format override regardless of extension', async () => {
     const path = join(tempDir, 'edicts.txt');
-    const store = new EdictStore({ path, format: 'json' });
+    const store = new EdictStore({ path, format: 'json', autoSave: false });
     await store.load();
-    store.add({ text: 'Test', category: 'test' });
+    await store.add({ text: 'Test', category: 'test' });
     await store.save();
 
-    const store2 = new EdictStore({ path, format: 'json' });
+    const store2 = new EdictStore({ path, format: 'json', autoSave: false });
     await store2.load();
-    expect(store2.all()).toHaveLength(1);
+    expect(await store2.all()).toHaveLength(1);
   });
 
   it('exposes schema validation warnings after load', async () => {
@@ -149,7 +149,7 @@ edicts:
     updated: "2026-03-20T06:00:00Z"
 `);
 
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
     expect(store.loadWarnings).toContain('Missing config section, using defaults');
@@ -178,11 +178,11 @@ edicts:
 history: []
 `);
 
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    expect(store.all()).toHaveLength(1);
-    expect(store.all()[0].id).toBe('e_001');
+    expect(await store.all()).toHaveLength(1);
+    expect(await store.all()[0].id).toBe('e_001');
     expect(store.has('e_001')).toBe(true);
   });
 
@@ -207,12 +207,12 @@ edicts:
 history: []
 `);
 
-    const store = new EdictStore({ path });
-    store.add({ text: 'New edict', category: 'test' });
+    const store = new EdictStore({ path, autoSave: false });
+    await store.add({ text: 'New edict', category: 'test' });
 
     await expect(store.save()).rejects.toBeInstanceOf(EdictConflictError);
 
-    const reloaded = new EdictStore({ path });
+    const reloaded = new EdictStore({ path, autoSave: false });
     await reloaded.load();
     expect(reloaded.all()).toHaveLength(1);
     expect(reloaded.all()[0].id).toBe('existing');
@@ -232,9 +232,9 @@ edicts: []
 history: []
 `);
 
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Persist config', category: 'alpha' });
+    await store.add({ text: 'Persist config', category: 'alpha' });
     await store.save();
 
     const raw = await (await import('node:fs/promises')).readFile(path, 'utf8');
@@ -248,10 +248,10 @@ history: []
 describe('EdictStore mutations', () => {
   it('add creates edict with defaults', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    const result = store.add({ text: 'New fact', category: 'Test' });
+    const result = await store.add({ text: 'New fact', category: 'Test' });
     const edict = result.edict;
     expect(result.action).toBe('created');
     expect(edict?.id).toBe('e_001');
@@ -264,10 +264,10 @@ describe('EdictStore mutations', () => {
 
   it('add with key uses key as ID', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    const result = store.add({
+    const result = await store.add({
       text: 'Product launch',
       category: 'product',
       key: 'product-v2-status',
@@ -277,12 +277,12 @@ describe('EdictStore mutations', () => {
 
   it('sequential IDs increment correctly', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    const e1 = store.add({ text: 'First', category: 'test' });
-    const e2 = store.add({ text: 'Second', category: 'test' });
-    const e3 = store.add({ text: 'Third', category: 'test' });
+    const e1 = await store.add({ text: 'First', category: 'test' });
+    const e2 = await store.add({ text: 'Second', category: 'test' });
+    const e3 = await store.add({ text: 'Third', category: 'test' });
     expect(e1.edict?.id).toBe('e_001');
     expect(e2.edict?.id).toBe('e_002');
     expect(e3.edict?.id).toBe('e_003');
@@ -290,26 +290,26 @@ describe('EdictStore mutations', () => {
 
   it('remove returns true for existing edict', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'To remove', category: 'test' });
-    expect(store.remove('e_001')).toMatchObject({ action: 'deleted', found: true });
-    expect(store.all()).toHaveLength(0);
+    await store.add({ text: 'To remove', category: 'test' });
+    expect(await store.remove('e_001')).toMatchObject({ action: 'deleted', found: true });
+    expect(await store.all()).toHaveLength(0);
   });
 
   it('remove returns false for nonexistent edict', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    expect(store.remove('nonexistent')).toMatchObject({ action: 'not_found', found: false, id: 'nonexistent' });
+    expect(await store.remove('nonexistent')).toMatchObject({ action: 'not_found', found: false, id: 'nonexistent' });
   });
 
   it('update modifies edict fields', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Original', category: 'test' });
-    const updated = store.update('e_001', { text: 'Updated text', category: 'Product' });
+    await store.add({ text: 'Original', category: 'test' });
+    const updated = await store.update('e_001', { text: 'Updated text', category: 'Product' });
     expect(updated.action).toBe('updated');
     expect(updated.edict?.text).toBe('Updated text');
     expect(updated.edict?.category).toBe('product');
@@ -317,36 +317,36 @@ describe('EdictStore mutations', () => {
 
   it('update throws for nonexistent edict', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    expect(() => store.update('nope', { text: 'Fail' })).toThrow('nope');
+    expect(() => await store.update('nope', { text: 'Fail' })).toThrow('nope');
   });
 
   it('rejects invalid input on add', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    expect(() => store.add({ text: '', category: 'test' })).toThrow('text');
+    expect(() => await store.add({ text: '', category: 'test' })).toThrow('text');
   });
 
   it('enforces category allowlist', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, categories: ['product', 'team'] });
     await store.load();
-    expect(() => store.add({ text: 'Hello', category: 'random' })).toThrow('random');
-    expect(() => store.add({ text: 'Hello', category: 'Product' })).not.toThrow();
+    expect(() => await store.add({ text: 'Hello', category: 'random' })).toThrow('random');
+    expect(() => await store.add({ text: 'Hello', category: 'Product' })).not.toThrow();
   });
 });
 
 describe('EdictStore reads', () => {
   it('get returns edict, updates lastAccessed, and marks store dirty', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Test', category: 'test', key: 'my-key' });
+    await store.add({ text: 'Test', category: 'test', key: 'my-key' });
     await store.save();
 
-    const edict = store.get('my-key');
+    const edict = await store.get('my-key');
     expect(edict?.text).toBe('Test');
     expect(edict?.lastAccessed).toBeDefined();
     expect(store.dirty).toBe(true);
@@ -354,20 +354,20 @@ describe('EdictStore reads', () => {
 
   it('has returns correct boolean', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Test', category: 'test' });
+    await store.add({ text: 'Test', category: 'test' });
     expect(store.has('e_001')).toBe(true);
     expect(store.has('nope')).toBe(false);
   });
 
   it('find with predicate works', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Product fact', category: 'product' });
-    store.add({ text: 'Team fact', category: 'team' });
-    store.add({ text: 'Another product', category: 'product' });
+    await store.add({ text: 'Product fact', category: 'product' });
+    await store.add({ text: 'Team fact', category: 'team' });
+    await store.add({ text: 'Another product', category: 'product' });
 
     const products = store.find((e) => e.category === 'product');
     expect(products).toHaveLength(2);
@@ -376,35 +376,35 @@ describe('EdictStore reads', () => {
 
   it('all returns cloned edicts', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Original', category: 'test' });
+    await store.add({ text: 'Original', category: 'test' });
 
-    const edicts = store.all();
+    const edicts = await store.all();
     edicts[0].text = 'Mutated externally';
 
-    expect(store.get('e_001')?.text).toBe('Original');
+    expect(await store.get('e_001')?.text).toBe('Original');
   });
 
   it('find returns cloned edicts', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Product fact', category: 'product' });
+    await store.add({ text: 'Product fact', category: 'product' });
 
     const products = store.find((e) => e.category === 'product');
     products[0].text = 'Mutated externally';
 
-    expect(store.get('e_001')?.text).toBe('Product fact');
+    expect(await store.get('e_001')?.text).toBe('Product fact');
   });
 
   it('categories returns sorted unique categories', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'A', category: 'team' });
-    store.add({ text: 'B', category: 'product' });
-    store.add({ text: 'C', category: 'team' });
+    await store.add({ text: 'A', category: 'team' });
+    await store.add({ text: 'B', category: 'product' });
+    await store.add({ text: 'C', category: 'team' });
     expect(store.categories()).toEqual(['product', 'team']);
   });
 });
@@ -414,7 +414,7 @@ describe('EdictStore budget', () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, tokenBudget: 1000 });
     await store.load();
-    store.add({ text: 'Hello world', category: 'test' });
+    await store.add({ text: 'Hello world', category: 'test' });
     expect(store.tokenCount()).toBeGreaterThan(0);
     expect(store.tokenBudgetRemaining()).toBeLessThan(1000);
   });
@@ -426,7 +426,7 @@ describe('EdictStore budget', () => {
 
     let error: unknown;
     try {
-      store.add({ text: 'a'.repeat(100), category: 'test' });
+      await store.add({ text: 'a'.repeat(100), category: 'test' });
     } catch (err) {
       error = err;
     }
@@ -439,11 +439,11 @@ describe('EdictStore budget', () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, maxEdicts: 1 });
     await store.load();
-    store.add({ text: 'First', category: 'test' });
+    await store.add({ text: 'First', category: 'test' });
 
     let error: unknown;
     try {
-      store.add({ text: 'Second', category: 'test' });
+      await store.add({ text: 'Second', category: 'test' });
     } catch (err) {
       error = err;
     }
@@ -462,7 +462,7 @@ describe('EdictStore budget', () => {
       tokenizer: (text) => text.length,
     });
     await store.load();
-    store.add({ text: 'hello', category: 'test' });
+    await store.add({ text: 'hello', category: 'test' });
     expect(store.tokenCount()).toBe(5);
   });
 
@@ -481,12 +481,12 @@ describe('EdictStore budget', () => {
       tokenizer: (text) => text.length,
     });
     await store.load();
-    store.add({ text: 'small', category: 'test' });
+    await store.add({ text: 'small', category: 'test' });
 
     expect(() =>
-      store.update('e_001', { text: 'this update is too large' })
+      await store.update('e_001', { text: 'this update is too large' })
     ).toThrow('budget');
-    expect(store.get('e_001')?.text).toBe('small');
+    expect(await store.get('e_001')?.text).toBe('small');
   });
 
   it('throws when superseding would exceed token budget', async () => {
@@ -497,16 +497,16 @@ describe('EdictStore budget', () => {
       tokenizer: (text) => text.length,
     });
     await store.load();
-    store.add({ text: 'small', category: 'test', key: 'shared-key' });
+    await store.add({ text: 'small', category: 'test', key: 'shared-key' });
 
     expect(() =>
-      store.add({
+      await store.add({
         text: 'this superseding text is too large',
         category: 'test',
         key: 'shared-key',
       })
     ).toThrow('budget');
-    expect(store.get('shared-key')?.text).toBe('small');
+    expect(await store.get('shared-key')?.text).toBe('small');
     expect(store.history()).toHaveLength(0);
   });
 });
@@ -514,33 +514,33 @@ describe('EdictStore budget', () => {
 describe('EdictStore rendering', () => {
   it('render plain returns formatted text', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Test fact', category: 'product', confidence: 'verified' });
-    const output = store.render('plain');
+    await store.add({ text: 'Test fact', category: 'product', confidence: 'verified' });
+    const output = await store.render('plain');
     expect(output).toContain('Test fact');
     expect(output).toContain('verified');
   });
 
   it('render markdown groups by category', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Fact A', category: 'product' });
-    store.add({ text: 'Fact B', category: 'team' });
-    const output = store.render('markdown');
+    await store.add({ text: 'Fact A', category: 'product' });
+    await store.add({ text: 'Fact B', category: 'team' });
+    const output = await store.render('markdown');
     expect(output).toContain('## product');
     expect(output).toContain('## team');
   });
 
   it('render json returns valid JSON and marks store dirty after access updates', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Test', category: 'test' });
+    await store.add({ text: 'Test', category: 'test' });
     await store.save();
 
-    const output = store.render('json');
+    const output = await store.render('json');
     const parsed = JSON.parse(output);
     expect(parsed).toHaveLength(1);
     expect(store.dirty).toBe(true);
@@ -553,8 +553,8 @@ describe('EdictStore rendering', () => {
       renderer: (edicts) => edicts.map((e) => `CUSTOM: ${e.text}`).join('|'),
     });
     await store.load();
-    store.add({ text: 'Hello', category: 'test' });
-    const output = store.render();
+    await store.add({ text: 'Hello', category: 'test' });
+    const output = await store.render();
     expect(output).toBe('CUSTOM: Hello');
   });
 
@@ -565,8 +565,8 @@ describe('EdictStore rendering', () => {
       renderer: () => 'CUSTOM',
     });
     await store.load();
-    store.add({ text: 'Hello', category: 'test' });
-    const output = store.render('plain');
+    await store.add({ text: 'Hello', category: 'test' });
+    const output = await store.render('plain');
     expect(output).toContain('Hello');
     expect(output).not.toBe('CUSTOM');
   });

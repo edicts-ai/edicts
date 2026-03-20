@@ -12,6 +12,10 @@ export type {
   FindQuery,
   EdictStats,
   ImportResult,
+  CapacityStatus,
+  CompactionGroup,
+  ReviewOptions,
+  ReviewResult,
 } from './types.js';
 
 export {
@@ -26,3 +30,4 @@ export {
 export { normalizeCategory, normalizeTags } from './normalize.js';
 export { defaultTokenizer } from './tokenizer.js';
 export { renderPlain, renderMarkdown, renderJson } from './renderer.js';
+export { parseDuration } from './duration.js';

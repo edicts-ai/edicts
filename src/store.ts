@@ -10,6 +10,10 @@ import type {
   FindQuery,
   EdictStats,
   ImportResult,
+  CapacityStatus,
+  CompactionGroup,
+  ReviewOptions,
+  ReviewResult,
 } from './types.js';
 import { YamlStorage } from './storage/yaml.js';
 import { JsonStorage } from './storage/json.js';
@@ -19,6 +23,7 @@ import { defaultTokenizer } from './tokenizer.js';
 import { renderPlain, renderMarkdown, renderJson } from './renderer.js';
 import { normalizeCategory, normalizeTags } from './normalize.js';
 import { validateEdictInput, validateFileSchema, pruneExpired } from './schema.js';
+import { parseDuration } from './duration.js';
 import {
   EdictBudgetExceededError,
   EdictCountLimitError,
@@ -43,6 +48,11 @@ export class EdictStore {
   private readonly maxEdicts: number;
   private readonly tokenBudget: number;
   private readonly categoryAllowlist: string[] | undefined;
+  private readonly staleThresholdDays: number;
+  private readonly categoryLimits: Record<string, number>;
+  private readonly defaultCategoryLimit: number | undefined;
+  private readonly defaultEphemeralTtlSeconds: number;
+  private readonly autoSave: boolean;
 
   constructor(options?: EdictStoreOptions) {
     const opts = options ?? {};
@@ -56,6 +66,11 @@ export class EdictStore {
     this.tokenBudget = opts.tokenBudget ?? 4000;
     this.categoryAllowlist =
       opts.categories && opts.categories.length > 0 ? opts.categories : undefined;
+    this.staleThresholdDays = opts.staleThresholdDays ?? 90;
+    this.categoryLimits = opts.categoryLimits ?? {};
+    this.defaultCategoryLimit = opts.defaultCategoryLimit;
+    this.defaultEphemeralTtlSeconds = opts.defaultEphemeralTtlSeconds ?? 86400;
+    this.autoSave = opts.autoSave ?? true;
 
     this._fileConfig = { ...DEFAULT_SCHEMA.config };
   }
@@ -113,6 +128,11 @@ export class EdictStore {
         maxEdicts: this._fileConfig.maxEdicts ?? this.maxEdicts,
         tokenBudget: this._fileConfig.tokenBudget ?? this.tokenBudget,
         categories: this._fileConfig.categories ?? this.categoryAllowlist ?? [],
+        staleThresholdDays: this._fileConfig.staleThresholdDays ?? this.staleThresholdDays,
+        categoryLimits: this._fileConfig.categoryLimits ?? this.categoryLimits,
+        defaultCategoryLimit: this._fileConfig.defaultCategoryLimit ?? this.defaultCategoryLimit,
+        defaultEphemeralTtlSeconds:
+          this._fileConfig.defaultEphemeralTtlSeconds ?? this.defaultEphemeralTtlSeconds,
       },
       edicts: this._edicts.map(({ _tokens, ...rest }) => rest),
       history: this._history,
@@ -123,20 +143,23 @@ export class EdictStore {
     this._dirty = false;
   }
 
-  add(input: EdictInput): MutationResult {
-    const pruned = this._autoPrune();
+  async add(input: EdictInput): Promise<MutationResult> {
+    const pruned = await this._autoPrune();
     validateEdictInput(input);
 
     const category = normalizeCategory(input.category);
     this._validateCategory(category);
     const tags = normalizeTags(input.tags ?? []);
     const now = new Date().toISOString();
+    const expiresAt = this._resolveExpiresAt(input);
 
     if (input.key) {
       const existingIdx = this._edicts.findIndex((e) => e.key === input.key);
       if (existingIdx !== -1) {
-        const edict = this._supersede(existingIdx, input, category, tags, now);
-        return { action: 'superseded', edict: structuredClone(edict), pruned };
+        const edict = this._supersede(existingIdx, input, category, tags, now, expiresAt);
+        const result = this._buildMutationResult('superseded', edict, pruned);
+        if (this.autoSave) await this.save();
+        return result;
       }
     }
 
@@ -154,7 +177,7 @@ export class EdictStore {
       source: input.source ?? '',
       key: input.key,
       ttl: input.ttl ?? 'durable',
-      expiresAt: input.expiresAt,
+      expiresAt,
       created: now,
       updated: now,
       _tokens: this.tokenizer(input.text),
@@ -167,31 +190,45 @@ export class EdictStore {
 
     this._edicts.push(edict);
     this._dirty = true;
-    return { action: 'created', edict: structuredClone(edict), pruned };
+
+    const result = this._buildMutationResult('created', edict, pruned);
+    if (this.autoSave) await this.save();
+    return result;
   }
 
-  remove(id: string): MutationResult {
-    const pruned = this._autoPrune();
+  async remove(id: string): Promise<MutationResult> {
+    const pruned = await this._autoPrune();
     const idx = this._edicts.findIndex((e) => e.id === id);
     if (idx === -1) return { action: 'not_found', found: false, id, pruned };
     const [removed] = this._edicts.splice(idx, 1);
     this._dirty = true;
+    if (this.autoSave) await this.save();
     return { action: 'deleted', found: true, edict: structuredClone(removed), pruned };
   }
 
-  update(id: string, patch: Partial<EdictInput>): MutationResult {
-    const pruned = this._autoPrune();
+  async update(id: string, patch: Partial<EdictInput>): Promise<MutationResult> {
+    const pruned = await this._autoPrune();
     const edict = this._edicts.find((e) => e.id === id);
     if (!edict) throw new EdictNotFoundError(id);
 
+    validateEdictInput({
+      text: patch.text ?? edict.text,
+      category: patch.category ?? edict.category,
+      confidence: patch.confidence ?? edict.confidence,
+      ttl: patch.ttl ?? edict.ttl,
+      expiresAt: patch.expiresAt !== undefined ? patch.expiresAt : edict.expiresAt,
+      expiresIn: patch.expiresIn,
+    });
+
     const nextText = patch.text ?? edict.text;
-    const nextTokens = patch.text !== undefined ? this.tokenizer(patch.text) : edict._tokens ?? this.tokenizer(edict.text);
+    const nextTokens =
+      patch.text !== undefined ? this.tokenizer(patch.text) : edict._tokens ?? this.tokenizer(edict.text);
     const nextCategory = patch.category !== undefined ? normalizeCategory(patch.category) : edict.category;
     const nextTags = patch.tags !== undefined ? normalizeTags(patch.tags) : edict.tags;
     const nextConfidence = patch.confidence ?? edict.confidence;
     const nextSource = patch.source ?? edict.source;
     const nextTtl = patch.ttl ?? edict.ttl;
-    const nextExpiresAt = patch.expiresAt !== undefined ? patch.expiresAt : edict.expiresAt;
+    const nextExpiresAt = this._resolveExpiresAt({ ...edict, ...patch, category: nextCategory, text: nextText, ttl: nextTtl });
 
     this._validateCategory(nextCategory);
 
@@ -211,10 +248,14 @@ export class EdictStore {
     edict.expiresAt = nextExpiresAt;
     edict.updated = new Date().toISOString();
     this._dirty = true;
-    return { action: 'updated', edict: structuredClone(edict), pruned };
+
+    const result = this._buildMutationResult('updated', edict, pruned);
+    if (this.autoSave) await this.save();
+    return result;
   }
 
-  get(id: string): Edict | undefined {
+  async get(id: string): Promise<Edict | undefined> {
+    await this._autoPrune();
     const edict = this._edicts.find((e) => e.id === id);
     if (!edict) {
       return undefined;
@@ -222,6 +263,7 @@ export class EdictStore {
 
     edict.lastAccessed = new Date().toISOString();
     this._dirty = true;
+    if (this.autoSave) await this.save();
     return structuredClone(edict);
   }
 
@@ -229,11 +271,13 @@ export class EdictStore {
     return this._edicts.some((e) => e.id === id);
   }
 
-  all(): Edict[] {
+  async all(): Promise<Edict[]> {
+    await this._autoPrune();
     return this._edicts.map((e) => structuredClone(e));
   }
 
-  find(predicate: ((e: Edict) => boolean) | FindQuery): Edict[] {
+  async find(predicate: ((e: Edict) => boolean) | FindQuery): Promise<Edict[]> {
+    await this._autoPrune();
     if (typeof predicate === 'function') {
       return this._edicts.filter(predicate).map((e) => structuredClone(e));
     }
@@ -257,20 +301,16 @@ export class EdictStore {
       .map((e) => structuredClone(e));
   }
 
-  search(query: string): Edict[] {
+  async search(query: string): Promise<Edict[]> {
+    await this._autoPrune();
     const needle = query.trim().toLowerCase();
     if (!needle) return this.all();
 
     return this._edicts
       .filter((e) => {
-        return [
-          e.id,
-          e.key ?? '',
-          e.text,
-          e.category,
-          e.source,
-          ...e.tags,
-        ].some((value) => value.toLowerCase().includes(needle));
+        return [e.id, e.key ?? '', e.text, e.category, e.source, ...e.tags].some((value) =>
+          value.toLowerCase().includes(needle)
+        );
       })
       .map((e) => structuredClone(e));
   }
@@ -283,7 +323,8 @@ export class EdictStore {
     return structuredClone(this._history);
   }
 
-  stats(): EdictStats {
+  async stats(): Promise<EdictStats> {
+    await this._autoPrune();
     const byCategory: Record<string, number> = {};
     const byConfidence: Record<string, number> = {};
     const byTtl: Record<string, number> = {};
@@ -311,6 +352,124 @@ export class EdictStore {
     });
   }
 
+  capacityStatus(): CapacityStatus {
+    const categories: CapacityStatus['categories'] = {};
+    for (const edict of this._edicts) {
+      const category = edict.category;
+      const limit = this.categoryLimits[category] ?? this.defaultCategoryLimit;
+      const current = categories[category] ?? { count: 0, limit, overLimit: false };
+      current.count += 1;
+      current.limit = limit;
+      current.overLimit = limit !== undefined ? current.count > limit : false;
+      categories[category] = current;
+    }
+
+    const countUsage = this.maxEdicts === 0 ? 0 : this._edicts.length / this.maxEdicts;
+    const tokenUsage = this.tokenBudget === 0 ? 0 : this.tokenCount() / this.tokenBudget;
+    const warnings: string[] = [];
+
+    if (countUsage >= 0.8) {
+      warnings.push(
+        `Store at ${Math.round(countUsage * 100)}% count capacity (${this._edicts.length}/${this.maxEdicts} edicts)`
+      );
+    }
+    if (tokenUsage >= 0.8) {
+      warnings.push(
+        `Store at ${Math.round(tokenUsage * 100)}% token capacity (${this.tokenCount()}/${this.tokenBudget} tokens)`
+      );
+    }
+
+    for (const [category, status] of Object.entries(categories)) {
+      if (status.limit !== undefined && status.count > status.limit) {
+        warnings.push(`Category "${category}" exceeds soft limit (${status.count}/${status.limit})`);
+      }
+    }
+
+    return structuredClone({ countUsage, tokenUsage, categories, warnings });
+  }
+
+  review(options?: ReviewOptions): ReviewResult {
+    const now = Date.now();
+    const staleThresholdMs = this.staleThresholdDays * 86400 * 1000;
+    const lookaheadMs = (options?.expiryLookaheadDays ?? 7) * 86400 * 1000;
+
+    const stale = this._edicts.filter((e) => {
+      if (e.ttl !== 'durable') return false;
+      const accessedAt = e.lastAccessed ?? e.created;
+      return now - new Date(accessedAt).getTime() > staleThresholdMs;
+    });
+
+    const expiringSoon = this._edicts.filter((e) => {
+      if (!e.expiresAt) return false;
+      const expiresMs = new Date(e.expiresAt).getTime();
+      const remaining = expiresMs - now;
+      return remaining > 0 && remaining <= lookaheadMs;
+    });
+
+    const capacity = this.capacityStatus();
+    const compactionCandidates = this._findCompactionCandidates();
+
+    return structuredClone({ stale, expiringSoon, capacity, compactionCandidates });
+  }
+
+  async compact(group: CompactionGroup, merged: EdictInput): Promise<MutationResult> {
+    const pruned = await this._autoPrune();
+    const snapshotEdicts = this._edicts.map((e) => structuredClone(e));
+    const snapshotHistory = this._history.map((h) => structuredClone(h));
+    const now = new Date().toISOString();
+
+    try {
+      const ids = new Set(group.edicts.map((e) => e.id));
+      const removed = this._edicts.filter((e) => ids.has(e.id));
+      this._edicts = this._edicts.filter((e) => !ids.has(e.id));
+      this._history = [
+        ...this._history,
+        ...removed.map((removedEdict) => ({
+          id: `${removedEdict.id}__${now.replace(/[-:.TZ]/g, '')}_compacted`,
+          text: removedEdict.text,
+          supersededBy: 'compacted',
+          archivedAt: now,
+        })),
+      ];
+
+      const category = normalizeCategory(merged.category);
+      this._validateCategory(category);
+      const tags = normalizeTags(merged.tags ?? []);
+      const expiresAt = this._resolveExpiresAt(merged);
+      const id = merged.key ?? this._nextSequentialId();
+      const edict: Edict = {
+        id,
+        text: merged.text,
+        category,
+        tags,
+        confidence: merged.confidence ?? 'user',
+        source: merged.source ?? '',
+        key: merged.key,
+        ttl: merged.ttl ?? 'durable',
+        expiresAt,
+        created: now,
+        updated: now,
+        _tokens: this.tokenizer(merged.text),
+      };
+
+      const newTotal = this.tokenCount() + (edict._tokens ?? 0);
+      if (newTotal > this.tokenBudget) {
+        throw new EdictBudgetExceededError(this.tokenBudget, newTotal);
+      }
+
+      this._edicts.push(edict);
+      this._dirty = true;
+      const result = this._buildMutationResult('created', edict, pruned);
+      if (this.autoSave) await this.save();
+      return result;
+    } catch (error) {
+      this._edicts = snapshotEdicts;
+      this._history = snapshotHistory;
+      this._dirty = true;
+      throw error;
+    }
+  }
+
   exportData(): EdictFileSchema {
     return structuredClone({
       version: 1,
@@ -318,6 +477,11 @@ export class EdictStore {
         maxEdicts: this._fileConfig.maxEdicts ?? this.maxEdicts,
         tokenBudget: this._fileConfig.tokenBudget ?? this.tokenBudget,
         categories: this._fileConfig.categories ?? this.categoryAllowlist ?? [],
+        staleThresholdDays: this._fileConfig.staleThresholdDays ?? this.staleThresholdDays,
+        categoryLimits: this._fileConfig.categoryLimits ?? this.categoryLimits,
+        defaultCategoryLimit: this._fileConfig.defaultCategoryLimit ?? this.defaultCategoryLimit,
+        defaultEphemeralTtlSeconds:
+          this._fileConfig.defaultEphemeralTtlSeconds ?? this.defaultEphemeralTtlSeconds,
       },
       edicts: this._edicts.map(({ _tokens, ...rest }) => rest),
       history: this._history,
@@ -352,13 +516,15 @@ export class EdictStore {
     });
   }
 
-  render(format?: 'plain' | 'markdown' | 'json'): string {
+  async render(format?: 'plain' | 'markdown' | 'json'): Promise<string> {
+    await this._autoPrune();
     const now = new Date().toISOString();
     for (const edict of this._edicts) {
       edict.lastAccessed = now;
     }
     if (this._edicts.length > 0) {
       this._dirty = true;
+      if (this.autoSave) await this.save();
     }
 
     if (this.customRenderer && !format) {
@@ -401,12 +567,30 @@ export class EdictStore {
     return [...this._loadWarnings];
   }
 
+  private _resolveExpiresAt(input: Partial<EdictInput> & { ttl?: Edict['ttl'] }): string | undefined {
+    if (input.expiresIn !== undefined) {
+      const seconds = parseDuration(input.expiresIn);
+      return new Date(Date.now() + seconds * 1000).toISOString();
+    }
+
+    if (input.expiresAt) {
+      return input.expiresAt;
+    }
+
+    if (input.ttl === 'ephemeral') {
+      return new Date(Date.now() + this.defaultEphemeralTtlSeconds * 1000).toISOString();
+    }
+
+    return undefined;
+  }
+
   private _supersede(
     existingIdx: number,
     input: EdictInput,
     category: string,
     tags: string[],
-    now: string
+    now: string,
+    expiresAt: string | undefined
   ): Edict {
     const existing = this._edicts[existingIdx];
     const previousText = existing.text;
@@ -436,7 +620,7 @@ export class EdictStore {
     existing.confidence = input.confidence ?? existing.confidence;
     existing.source = input.source ?? existing.source;
     existing.ttl = input.ttl ?? existing.ttl;
-    existing.expiresAt = input.expiresAt;
+    existing.expiresAt = expiresAt;
     existing.updated = now;
     existing._tokens = this.tokenizer(input.text);
 
@@ -482,7 +666,7 @@ export class EdictStore {
     return max;
   }
 
-  private _autoPrune(): number {
+  private async _autoPrune(): Promise<number> {
     const { active, expired } = pruneExpired(this._edicts);
     if (expired.length === 0) {
       return 0;
@@ -491,6 +675,53 @@ export class EdictStore {
     this._edicts = active;
     this._history = [...this._history, ...expired];
     this._dirty = true;
+    if (this.autoSave) await this.save();
     return expired.length;
+  }
+
+  private _findCompactionCandidates(): CompactionGroup[] {
+    const groups = new Map<string, Edict[]>();
+
+    for (const edict of this._edicts) {
+      if (!edict.key) continue;
+      const keyPrefix = this._keyPrefix(edict.key);
+      const groupKey = `${edict.category}::${keyPrefix}`;
+      const existing = groups.get(groupKey) ?? [];
+      existing.push(edict);
+      groups.set(groupKey, existing);
+    }
+
+    return [...groups.entries()]
+      .filter(([, edicts]) => edicts.length >= 2)
+      .map(([groupKey, edicts]) => {
+        const [category, keyPrefix] = groupKey.split('::');
+        return { keyPrefix, category, edicts: structuredClone(edicts) };
+      });
+  }
+
+  private _keyPrefix(key: string): string {
+    for (const separator of ['/', '.', '-']) {
+      if (key.includes(separator)) {
+        const parts = key.split(separator);
+        if (parts.length > 1) {
+          return parts.slice(0, -1).join(separator);
+        }
+      }
+    }
+    return key;
+  }
+
+  private _buildMutationResult(
+    action: MutationResult['action'],
+    edict: Edict | undefined,
+    pruned: number
+  ): MutationResult {
+    const warnings = this.capacityStatus().warnings;
+    return {
+      action,
+      edict: edict ? structuredClone(edict) : undefined,
+      pruned,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
   }
 }
