@@ -209,11 +209,13 @@ export class EdictStore {
 
   get(id: string): Edict | undefined {
     const edict = this._edicts.find((e) => e.id === id);
-    if (edict) {
-      edict.lastAccessed = new Date().toISOString();
-      this._dirty = true;
+    if (!edict) {
+      return undefined;
     }
-    return edict;
+
+    edict.lastAccessed = new Date().toISOString();
+    this._dirty = true;
+    return structuredClone(edict);
   }
 
   has(id: string): boolean {
@@ -303,7 +305,9 @@ export class EdictStore {
     const previousUpdated = existing.updated;
     const previousTokens = existing._tokens ?? this.tokenizer(existing.text);
 
-    const historyId = `${existing.id}__${now.slice(0, 10).replace(/-/g, '')}`;
+    const version =
+      this._history.filter((entry) => entry.supersededBy === existing.id).length + 1;
+    const historyId = `${existing.id}__${now.replace(/[-:.TZ]/g, '')}_${String(version).padStart(3, '0')}`;
     this._history.push({
       id: historyId,
       text: previousText,

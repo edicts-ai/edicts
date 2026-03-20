@@ -3,11 +3,7 @@
  * Covers common cases. Not exhaustive, but handles the 90%.
  */
 const NATURAL_S_ENDINGS = new Set([
-  'process', 'status', 'analysis', 'business', 'address',
-  'access', 'success', 'progress', 'congress', 'express',
-  'class', 'mass', 'pass', 'loss', 'boss', 'miss',
-  'plus', 'thesis', 'diagnosis', 'basis', 'crisis',
-  'alias', 'atlas', 'bias', 'canvas', 'chaos',
+  'chaos',
 ]);
 
 /** Minimum length to consider stripping trailing 's' */

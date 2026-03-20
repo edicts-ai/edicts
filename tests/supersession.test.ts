@@ -65,6 +65,19 @@ describe('Supersession', () => {
     expect(store.history()).toHaveLength(2);
   });
 
+  it('history IDs stay unique across multiple supersessions of the same key', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+
+    store.add({ text: 'Version 1', category: 'product', key: 'status' });
+    store.add({ text: 'Version 2', category: 'product', key: 'status' });
+    store.add({ text: 'Version 3', category: 'product', key: 'status' });
+
+    const historyIds = store.history().map((entry) => entry.id);
+    expect(new Set(historyIds).size).toBe(historyIds.length);
+  });
+
   it('supersession persists through save/load', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path });

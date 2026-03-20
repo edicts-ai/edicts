@@ -67,6 +67,28 @@ history: []
     expect(store2.all()).toHaveLength(1);
   });
 
+  it('get returns a clone and does not expose internal mutable state', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+
+    store.add({ text: 'Original text', category: 'test', tags: ['one'] });
+
+    const edict = store.get('e_001');
+    expect(edict?.text).toBe('Original text');
+
+    if (!edict) {
+      throw new Error('Expected edict to exist');
+    }
+
+    edict.text = 'Mutated outside store';
+    edict.tags.push('two');
+
+    const reread = store.get('e_001');
+    expect(reread?.text).toBe('Original text');
+    expect(reread?.tags).toEqual(['one']);
+  });
+
   it('dirty flag tracks unsaved changes', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path });
