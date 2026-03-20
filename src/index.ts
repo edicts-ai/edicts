@@ -36,6 +36,8 @@ export {
   openclawPluginEdicts,
   edictsPluginConfigSchema,
   createEdictsTools,
+  buildBeforePromptBuildResult,
+  normalizePluginConfig,
 } from './openclaw/index.js';
 
 export type {

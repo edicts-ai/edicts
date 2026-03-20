@@ -43,6 +43,8 @@ This package now includes `openclaw-plugin-edicts`, an OpenClaw plugin adapter t
 }
 ```
 
+`tools.optional` defaults to `true`. When `true`, OpenClaw can treat the registered Edicts tools as optional and continue loading even if the host chooses not to require them. Set it to `false` when your integration expects these tools to be present and should fail fast if tool registration cannot be satisfied.
+
 ### Programmatic exports
 
 ```ts
