@@ -106,8 +106,33 @@ describe('review', () => {
     live.created = '2025-01-01T00:00:00Z';
     live.lastAccessed = '2025-01-01T00:00:00Z';
 
-    const result = store.review();
+    const result = await store.review();
     expect(result.stale).toHaveLength(1);
+  });
+
+  it('prunes expired edicts before reviewing lifecycle state', async () => {
+    const store = await makeStore('review-prunes');
+    await store.load();
+
+    (store as any)._edicts.push({
+      id: 'expired-review',
+      text: 'Expired review item',
+      category: 'test',
+      tags: [],
+      confidence: 'user',
+      source: '',
+      ttl: 'event',
+      expiresAt: '2020-01-01T00:00:00Z',
+      created: '2020-01-01T00:00:00Z',
+      updated: '2020-01-01T00:00:00Z',
+      _tokens: 5,
+    });
+
+    const result = await store.review();
+    expect(result.stale).toHaveLength(0);
+    expect(result.expiringSoon).toHaveLength(0);
+    expect(result.compactionCandidates).toHaveLength(0);
+    expect(store.history().some((h) => h.id.startsWith('expired-review'))).toBe(true);
   });
 
   it('surfaces expiring soon edicts and compaction candidates', async () => {
@@ -119,13 +144,47 @@ describe('review', () => {
     await store.add({ text: 'Soon', category: 'product', ttl: 'event', expiresAt: soon, key: 'product/v2/alpha' });
     await store.add({ text: 'Later', category: 'product', ttl: 'event', expiresAt: later, key: 'product/v2/beta' });
 
-    const result = store.review();
+    const result = await store.review();
     expect(result.expiringSoon).toHaveLength(1);
     expect(result.compactionCandidates.some((g) => g.keyPrefix === 'product/v2')).toBe(true);
+  });
+
+  it('does not group unrelated dash-separated flat keys as compaction candidates', async () => {
+    const store = await makeStore('review-dash-keys');
+    await store.load();
+
+    await store.add({ text: 'Rate limit', category: 'product', key: 'rate-limit' });
+    await store.add({ text: 'Rate control', category: 'product', key: 'rate-control' });
+
+    const result = await store.review();
+    expect(result.compactionCandidates).toHaveLength(0);
   });
 });
 
 describe('compact', () => {
+  it('validates merged compacted edict input before mutating store state', async () => {
+    const store = await makeStore('compact-validate');
+    await store.load();
+
+    await store.add({ text: 'A', category: 'product', key: 'product/v2/a' });
+    await store.add({ text: 'B', category: 'product', key: 'product/v2/b' });
+
+    const group = (await store.review()).compactionCandidates[0];
+
+    await expect(
+      store.compact(group, {
+        text: '',
+        category: 'product',
+        expiresAt: 'not-a-date',
+        expiresIn: '2h',
+      })
+    ).rejects.toThrow();
+
+    const all = await store.all();
+    expect(all).toHaveLength(2);
+    expect(store.history()).toHaveLength(0);
+  });
+
   it('compacts a group into a single merged edict and archives originals', async () => {
     const store = await makeStore('compact');
     await store.load();
@@ -133,7 +192,7 @@ describe('compact', () => {
     await store.add({ text: 'A', category: 'product', key: 'product/v2/a' });
     await store.add({ text: 'B', category: 'product', key: 'product/v2/b' });
 
-    const group = store.review().compactionCandidates.find((g) => g.keyPrefix === 'product/v2') as CompactionGroup;
+    const group = (await store.review()).compactionCandidates.find((g) => g.keyPrefix === 'product/v2') as CompactionGroup;
     const result = await store.compact(group, {
       text: 'Merged',
       category: 'product',
@@ -155,7 +214,7 @@ describe('compact', () => {
     await store.add({ text: 'a', category: 'product', key: 'product/v2/a' });
     await store.add({ text: 'b', category: 'product', key: 'product/v2/b' });
 
-    const group = store.review().compactionCandidates[0];
+    const group = (await store.review()).compactionCandidates[0];
 
     await expect(
       store.compact(group, { text: 'this is way too long', category: 'product', key: 'product/v2' })
@@ -193,6 +252,20 @@ describe('auto-save and pruning on reads', () => {
     await store.add({ text: 'Unsaved', category: 'test' });
     const persisted = await readFile((store as any).storage.path, 'utf8');
     expect(persisted).not.toContain('Unsaved');
+  });
+
+  it('auto-saves imported data when autoSave is enabled', async () => {
+    const source = await makeStore('import-autosave-source', { autoSave: false });
+    await source.load();
+    await source.add({ text: 'Imported fact', category: 'test' });
+    const exported = source.exportData();
+
+    const target = await makeStore('import-autosave-target', { autoSave: true });
+    await target.load();
+    await target.importData(exported);
+
+    const persisted = await readFile((target as any).storage.path, 'utf8');
+    expect(persisted).toContain('Imported fact');
   });
 
   it('prunes expired edicts on read methods and auto-saves prune when enabled', async () => {

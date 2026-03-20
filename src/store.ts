@@ -395,7 +395,8 @@ export class EdictStore {
     return structuredClone({ countUsage, tokenUsage, categories, warnings });
   }
 
-  review(options?: ReviewOptions): ReviewResult {
+  async review(options?: ReviewOptions): Promise<ReviewResult> {
+    await this._autoPrune();
     const now = Date.now();
     const staleThresholdMs = this.staleThresholdDays * 86400 * 1000;
     const lookaheadMs = (options?.expiryLookaheadDays ?? 7) * 86400 * 1000;
@@ -423,9 +424,11 @@ export class EdictStore {
     const pruned = await this._autoPrune();
     const snapshotEdicts = this._edicts.map((e) => structuredClone(e));
     const snapshotHistory = this._history.map((h) => structuredClone(h));
+    const snapshotDirty = this._dirty;
     const now = new Date().toISOString();
 
     try {
+      validateEdictInput(merged);
       const ids = new Set(group.edicts.map((e) => e.id));
       const removed = this._edicts.filter((e) => ids.has(e.id));
       this._edicts = this._edicts.filter((e) => !ids.has(e.id));
@@ -472,7 +475,7 @@ export class EdictStore {
     } catch (error) {
       this._edicts = snapshotEdicts;
       this._history = snapshotHistory;
-      this._dirty = true;
+      this._dirty = snapshotDirty;
       throw error;
     }
   }
@@ -495,7 +498,7 @@ export class EdictStore {
     });
   }
 
-  importData(data: EdictFileSchema): ImportResult {
+  async importData(data: EdictFileSchema): Promise<ImportResult> {
     const warnings = validateFileSchema(data);
     if (warnings.length > 0) {
       this._loadWarnings = [...this._loadWarnings, ...warnings];
@@ -516,11 +519,14 @@ export class EdictStore {
     this._sequentialCounter = this._computeNextSequential();
     this._dirty = true;
 
-    return structuredClone({
+    const result = structuredClone({
       imported: this._edicts.length,
       historyImported: data.history?.length ?? 0,
       pruned: expired.length,
     });
+
+    if (this.autoSave) await this.save();
+    return result;
   }
 
   async render(format?: 'plain' | 'markdown' | 'json'): Promise<string> {
@@ -709,7 +715,7 @@ export class EdictStore {
   }
 
   private _keyPrefix(key: string): string {
-    for (const separator of ['/', '.', '-']) {
+    for (const separator of ['/', '.']) {
       if (key.includes(separator)) {
         const parts = key.split(separator);
         if (parts.length > 1) {
@@ -736,3 +742,4 @@ export class EdictStore {
     };
   }
 }
+
