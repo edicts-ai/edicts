@@ -89,3 +89,136 @@ history: []
     expect(store2.all()).toHaveLength(1);
   });
 });
+
+describe('EdictStore mutations', () => {
+  it('add creates edict with defaults', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+
+    const edict = store.add({ text: 'New fact', category: 'Test' });
+    expect(edict.id).toBe('e_001');
+    expect(edict.category).toBe('test');
+    expect(edict.confidence).toBe('user');
+    expect(edict.ttl).toBe('durable');
+    expect(edict.tags).toEqual([]);
+    expect(edict._tokens).toBeGreaterThan(0);
+  });
+
+  it('add with key uses key as ID', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+
+    const edict = store.add({
+      text: 'Product launch',
+      category: 'product',
+      key: 'product-v2-status',
+    });
+    expect(edict.id).toBe('product-v2-status');
+  });
+
+  it('sequential IDs increment correctly', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+
+    const e1 = store.add({ text: 'First', category: 'test' });
+    const e2 = store.add({ text: 'Second', category: 'test' });
+    const e3 = store.add({ text: 'Third', category: 'test' });
+    expect(e1.id).toBe('e_001');
+    expect(e2.id).toBe('e_002');
+    expect(e3.id).toBe('e_003');
+  });
+
+  it('remove returns true for existing edict', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'To remove', category: 'test' });
+    expect(store.remove('e_001')).toBe(true);
+    expect(store.all()).toHaveLength(0);
+  });
+
+  it('remove returns false for nonexistent edict', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    expect(store.remove('nonexistent')).toBe(false);
+  });
+
+  it('update modifies edict fields', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Original', category: 'test' });
+    const updated = store.update('e_001', { text: 'Updated text', category: 'Product' });
+    expect(updated.text).toBe('Updated text');
+    expect(updated.category).toBe('product');
+  });
+
+  it('update throws for nonexistent edict', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    expect(() => store.update('nope', { text: 'Fail' })).toThrow('nope');
+  });
+
+  it('rejects invalid input on add', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    expect(() => store.add({ text: '', category: 'test' })).toThrow('text');
+  });
+
+  it('enforces category allowlist', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path, categories: ['product', 'team'] });
+    await store.load();
+    expect(() => store.add({ text: 'Hello', category: 'random' })).toThrow('random');
+    expect(() => store.add({ text: 'Hello', category: 'Product' })).not.toThrow();
+  });
+});
+
+describe('EdictStore reads', () => {
+  it('get returns edict and updates lastAccessed', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Test', category: 'test', key: 'my-key' });
+    const edict = store.get('my-key');
+    expect(edict?.text).toBe('Test');
+    expect(edict?.lastAccessed).toBeDefined();
+  });
+
+  it('has returns correct boolean', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Test', category: 'test' });
+    expect(store.has('e_001')).toBe(true);
+    expect(store.has('nope')).toBe(false);
+  });
+
+  it('find with predicate works', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Product fact', category: 'product' });
+    store.add({ text: 'Team fact', category: 'team' });
+    store.add({ text: 'Another product', category: 'product' });
+
+    const products = store.find((e) => e.category === 'product');
+    expect(products).toHaveLength(2);
+  });
+
+  it('categories returns sorted unique categories', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'A', category: 'team' });
+    store.add({ text: 'B', category: 'product' });
+    store.add({ text: 'C', category: 'team' });
+    expect(store.categories()).toEqual(['product', 'team']);
+  });
+});
