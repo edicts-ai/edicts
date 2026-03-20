@@ -17,6 +17,7 @@ import { normalizeCategory, normalizeTags } from './normalize.js';
 import { validateEdictInput, validateFileSchema, pruneExpired } from './schema.js';
 import {
   EdictBudgetExceededError,
+  EdictCountLimitError,
   EdictConflictError,
   EdictCategoryError,
   EdictNotFoundError,
@@ -125,7 +126,7 @@ export class EdictStore {
     }
 
     if (this._edicts.length >= this.maxEdicts) {
-      throw new EdictBudgetExceededError(this.maxEdicts, this._edicts.length);
+      throw new EdictCountLimitError(this.maxEdicts, this._edicts.length);
     }
 
     const id = input.key ?? this._nextSequentialId();
@@ -201,6 +202,7 @@ export class EdictStore {
     const edict = this._edicts.find((e) => e.id === id);
     if (edict) {
       edict.lastAccessed = new Date().toISOString();
+      this._dirty = true;
     }
     return edict;
   }
@@ -229,6 +231,9 @@ export class EdictStore {
     const now = new Date().toISOString();
     for (const edict of this._edicts) {
       edict.lastAccessed = now;
+    }
+    if (this._edicts.length > 0) {
+      this._dirty = true;
     }
 
     if (this.customRenderer && !format) {

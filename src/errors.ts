@@ -10,6 +10,18 @@ export class EdictBudgetExceededError extends Error {
   }
 }
 
+export class EdictCountLimitError extends Error {
+  readonly limit: number;
+  readonly current: number;
+
+  constructor(limit: number, current: number) {
+    super(`Edict count limit exceeded: ${current} edicts present, limit is ${limit}`);
+    this.name = 'EdictCountLimitError';
+    this.limit = limit;
+    this.current = current;
+  }
+}
+
 export class EdictConflictError extends Error {
   readonly expectedHash: string;
   readonly actualHash: string;

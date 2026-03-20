@@ -6,9 +6,7 @@ const NATURAL_S_ENDINGS = new Set([
   'process', 'status', 'analysis', 'business', 'address',
   'access', 'success', 'progress', 'congress', 'express',
   'class', 'mass', 'pass', 'loss', 'boss', 'miss',
-  'bus', 'plus', 'bonus', 'campus', 'census', 'consensus',
-  'corpus', 'focus', 'genus', 'nexus', 'radius', 'stimulus',
-  'syllabus', 'thesis', 'diagnosis', 'basis', 'crisis',
+  'plus', 'thesis', 'diagnosis', 'basis', 'crisis',
   'alias', 'atlas', 'bias', 'canvas', 'chaos',
 ]);
 

@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EdictStore } from '../src/store.js';
+import { EdictBudgetExceededError, EdictCountLimitError } from '../src/errors.js';
 
 let tempDir: string;
 
@@ -203,14 +204,17 @@ describe('EdictStore mutations', () => {
 });
 
 describe('EdictStore reads', () => {
-  it('get returns edict and updates lastAccessed', async () => {
+  it('get returns edict, updates lastAccessed, and marks store dirty', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path });
     await store.load();
     store.add({ text: 'Test', category: 'test', key: 'my-key' });
+    await store.save();
+
     const edict = store.get('my-key');
     expect(edict?.text).toBe('Test');
     expect(edict?.lastAccessed).toBeDefined();
+    expect(store.dirty).toBe(true);
   });
 
   it('has returns correct boolean', async () => {
@@ -259,9 +263,35 @@ describe('EdictStore budget', () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, tokenBudget: 5 });
     await store.load();
-    expect(() =>
-      store.add({ text: 'a'.repeat(100), category: 'test' })
-    ).toThrow('budget');
+
+    let error: unknown;
+    try {
+      store.add({ text: 'a'.repeat(100), category: 'test' });
+    } catch (err) {
+      error = err;
+    }
+
+    expect(error).toBeInstanceOf(EdictBudgetExceededError);
+    expect((error as EdictBudgetExceededError).budget).toBe(5);
+  });
+
+  it('throws a distinct error when max edict count is exceeded', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path, maxEdicts: 1 });
+    await store.load();
+    store.add({ text: 'First', category: 'test' });
+
+    let error: unknown;
+    try {
+      store.add({ text: 'Second', category: 'test' });
+    } catch (err) {
+      error = err;
+    }
+
+    expect(error).toBeInstanceOf(EdictCountLimitError);
+    expect((error as EdictCountLimitError).limit).toBe(1);
+    expect((error as EdictCountLimitError).current).toBe(1);
+    expect((error as Error).message).toContain('count limit');
   });
 
   it('uses custom tokenizer', async () => {
@@ -343,14 +373,17 @@ describe('EdictStore rendering', () => {
     expect(output).toContain('## team');
   });
 
-  it('render json returns valid JSON', async () => {
+  it('render json returns valid JSON and marks store dirty after access updates', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path });
     await store.load();
     store.add({ text: 'Test', category: 'test' });
+    await store.save();
+
     const output = store.render('json');
     const parsed = JSON.parse(output);
     expect(parsed).toHaveLength(1);
+    expect(store.dirty).toBe(true);
   });
 
   it('custom renderer is used when no format specified', async () => {

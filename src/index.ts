@@ -12,6 +12,7 @@ export type {
 
 export {
   EdictBudgetExceededError,
+  EdictCountLimitError,
   EdictConflictError,
   EdictCategoryError,
   EdictValidationError,

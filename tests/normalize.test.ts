@@ -22,6 +22,8 @@ describe('normalizeCategory', () => {
     expect(normalizeCategory('status')).toBe('status');
     expect(normalizeCategory('analysis')).toBe('analysis');
     expect(normalizeCategory('business')).toBe('business');
+    expect(normalizeCategory('bonus')).toBe('bonus');
+    expect(normalizeCategory('campus')).toBe('campus');
   });
 
   it('does not strip s from short words', () => {
