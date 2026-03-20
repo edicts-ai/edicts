@@ -6,6 +6,10 @@ import type {
   EdictFileSchema,
   Tokenizer,
   Renderer,
+  MutationResult,
+  FindQuery,
+  EdictStats,
+  ImportResult,
 } from './types.js';
 import { YamlStorage } from './storage/yaml.js';
 import { JsonStorage } from './storage/json.js';
@@ -119,7 +123,8 @@ export class EdictStore {
     this._dirty = false;
   }
 
-  add(input: EdictInput): Edict {
+  add(input: EdictInput): MutationResult {
+    const pruned = this._autoPrune();
     validateEdictInput(input);
 
     const category = normalizeCategory(input.category);
@@ -130,7 +135,8 @@ export class EdictStore {
     if (input.key) {
       const existingIdx = this._edicts.findIndex((e) => e.key === input.key);
       if (existingIdx !== -1) {
-        return this._supersede(existingIdx, input, category, tags, now);
+        const edict = this._supersede(existingIdx, input, category, tags, now);
+        return { action: 'superseded', edict: structuredClone(edict), pruned };
       }
     }
 
@@ -161,18 +167,20 @@ export class EdictStore {
 
     this._edicts.push(edict);
     this._dirty = true;
-    return edict;
+    return { action: 'created', edict: structuredClone(edict), pruned };
   }
 
-  remove(id: string): boolean {
+  remove(id: string): MutationResult {
+    const pruned = this._autoPrune();
     const idx = this._edicts.findIndex((e) => e.id === id);
-    if (idx === -1) return false;
-    this._edicts.splice(idx, 1);
+    if (idx === -1) return { action: 'not_found', found: false, id, pruned };
+    const [removed] = this._edicts.splice(idx, 1);
     this._dirty = true;
-    return true;
+    return { action: 'deleted', found: true, edict: structuredClone(removed), pruned };
   }
 
-  update(id: string, patch: Partial<EdictInput>): Edict {
+  update(id: string, patch: Partial<EdictInput>): MutationResult {
+    const pruned = this._autoPrune();
     const edict = this._edicts.find((e) => e.id === id);
     if (!edict) throw new EdictNotFoundError(id);
 
@@ -203,7 +211,7 @@ export class EdictStore {
     edict.expiresAt = nextExpiresAt;
     edict.updated = new Date().toISOString();
     this._dirty = true;
-    return edict;
+    return { action: 'updated', edict: structuredClone(edict), pruned };
   }
 
   get(id: string): Edict | undefined {
@@ -225,8 +233,46 @@ export class EdictStore {
     return this._edicts.map((e) => structuredClone(e));
   }
 
-  find(predicate: (e: Edict) => boolean): Edict[] {
-    return this._edicts.filter(predicate).map((e) => structuredClone(e));
+  find(predicate: ((e: Edict) => boolean) | FindQuery): Edict[] {
+    if (typeof predicate === 'function') {
+      return this._edicts.filter(predicate).map((e) => structuredClone(e));
+    }
+
+    const query = predicate;
+    const normalizedCategory = query.category ? normalizeCategory(query.category) : undefined;
+    const normalizedTag = query.tag ? normalizeTags([query.tag])[0] : undefined;
+    const normalizedText = query.text?.toLowerCase();
+
+    return this._edicts
+      .filter((e) => {
+        if (query.id !== undefined && e.id !== query.id) return false;
+        if (query.key !== undefined && e.key !== query.key) return false;
+        if (normalizedCategory !== undefined && e.category !== normalizedCategory) return false;
+        if (normalizedTag !== undefined && !e.tags.includes(normalizedTag)) return false;
+        if (query.confidence !== undefined && e.confidence !== query.confidence) return false;
+        if (query.ttl !== undefined && e.ttl !== query.ttl) return false;
+        if (normalizedText !== undefined && !e.text.toLowerCase().includes(normalizedText)) return false;
+        return true;
+      })
+      .map((e) => structuredClone(e));
+  }
+
+  search(query: string): Edict[] {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return this.all();
+
+    return this._edicts
+      .filter((e) => {
+        return [
+          e.id,
+          e.key ?? '',
+          e.text,
+          e.category,
+          e.source,
+          ...e.tags,
+        ].some((value) => value.toLowerCase().includes(needle));
+      })
+      .map((e) => structuredClone(e));
   }
 
   categories(): string[] {
@@ -234,7 +280,76 @@ export class EdictStore {
   }
 
   history(): HistoryEntry[] {
-    return [...this._history];
+    return structuredClone(this._history);
+  }
+
+  stats(): EdictStats {
+    const byCategory: Record<string, number> = {};
+    const byConfidence: Record<string, number> = {};
+    const byTtl: Record<string, number> = {};
+    const byTag: Record<string, number> = {};
+
+    for (const edict of this._edicts) {
+      byCategory[edict.category] = (byCategory[edict.category] ?? 0) + 1;
+      byConfidence[edict.confidence] = (byConfidence[edict.confidence] ?? 0) + 1;
+      byTtl[edict.ttl] = (byTtl[edict.ttl] ?? 0) + 1;
+      for (const tag of edict.tags) {
+        byTag[tag] = (byTag[tag] ?? 0) + 1;
+      }
+    }
+
+    return structuredClone({
+      total: this._edicts.length,
+      history: this._history.length,
+      tokenCount: this.tokenCount(),
+      tokenBudget: this.tokenBudget,
+      tokenBudgetRemaining: this.tokenBudgetRemaining(),
+      byCategory,
+      byConfidence,
+      byTtl,
+      byTag,
+    });
+  }
+
+  exportData(): EdictFileSchema {
+    return structuredClone({
+      version: 1,
+      config: {
+        maxEdicts: this._fileConfig.maxEdicts ?? this.maxEdicts,
+        tokenBudget: this._fileConfig.tokenBudget ?? this.tokenBudget,
+        categories: this._fileConfig.categories ?? this.categoryAllowlist ?? [],
+      },
+      edicts: this._edicts.map(({ _tokens, ...rest }) => rest),
+      history: this._history,
+    });
+  }
+
+  importData(data: EdictFileSchema): ImportResult {
+    const warnings = validateFileSchema(data);
+    if (warnings.length > 0) {
+      this._loadWarnings = [...this._loadWarnings, ...warnings];
+    }
+
+    this._fileConfig = data.config ?? this._fileConfig;
+    this._history = structuredClone(data.history ?? []);
+    this._edicts = (data.edicts ?? []).map((e) => ({
+      ...e,
+      category: normalizeCategory(e.category),
+      tags: normalizeTags(e.tags ?? []),
+      _tokens: this.tokenizer(e.text),
+    }));
+
+    const { active, expired } = pruneExpired(this._edicts);
+    this._edicts = active;
+    this._history = [...this._history, ...expired];
+    this._sequentialCounter = this._computeNextSequential();
+    this._dirty = true;
+
+    return structuredClone({
+      imported: this._edicts.length,
+      historyImported: data.history?.length ?? 0,
+      pruned: expired.length,
+    });
   }
 
   render(format?: 'plain' | 'markdown' | 'json'): string {
@@ -307,7 +422,7 @@ export class EdictStore {
     const version =
       this._history.filter((entry) => entry.supersededBy === existing.id).length + 1;
     const ts = now.replace(/[-:.TZ]/g, '');
-    const historyId = `${existing.id}__v${String(version).padStart(3, '0')}_${ts}`;
+    const historyId = `${existing.id}__${ts}_${String(version).padStart(3, '0')}`;
     this._history.push({
       id: historyId,
       text: previousText,
@@ -365,5 +480,17 @@ export class EdictStore {
       }
     }
     return max;
+  }
+
+  private _autoPrune(): number {
+    const { active, expired } = pruneExpired(this._edicts);
+    if (expired.length === 0) {
+      return 0;
+    }
+
+    this._edicts = active;
+    this._history = [...this._history, ...expired];
+    this._dirty = true;
+    return expired.length;
   }
 }

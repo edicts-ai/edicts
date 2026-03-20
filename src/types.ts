@@ -66,6 +66,42 @@ export interface HistoryEntry {
   archivedAt: string;
 }
 
+export interface MutationResult {
+  action: 'created' | 'updated' | 'deleted' | 'superseded' | 'not_found';
+  found?: boolean;
+  id?: string;
+  edict?: Edict;
+  pruned: number;
+}
+
+export interface EdictStats {
+  total: number;
+  history: number;
+  tokenCount: number;
+  tokenBudget: number;
+  tokenBudgetRemaining: number;
+  byCategory: Record<string, number>;
+  byConfidence: Record<string, number>;
+  byTtl: Record<string, number>;
+  byTag: Record<string, number>;
+}
+
+export interface ImportResult {
+  imported: number;
+  historyImported: number;
+  pruned: number;
+}
+
+export interface FindQuery {
+  id?: string;
+  key?: string;
+  category?: string;
+  tag?: string;
+  confidence?: 'verified' | 'inferred' | 'user';
+  ttl?: 'ephemeral' | 'event' | 'durable' | 'permanent';
+  text?: string;
+}
+
 /**
  * Tokenizer function signature.
  * Takes text, returns approximate token count.

@@ -8,6 +8,10 @@ export type {
   EdictFileSchema,
   Tokenizer,
   Renderer,
+  MutationResult,
+  FindQuery,
+  EdictStats,
+  ImportResult,
 } from './types.js';
 
 export {

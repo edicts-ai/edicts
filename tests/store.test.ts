@@ -251,13 +251,15 @@ describe('EdictStore mutations', () => {
     const store = new EdictStore({ path });
     await store.load();
 
-    const edict = store.add({ text: 'New fact', category: 'Test' });
-    expect(edict.id).toBe('e_001');
-    expect(edict.category).toBe('test');
-    expect(edict.confidence).toBe('user');
-    expect(edict.ttl).toBe('durable');
-    expect(edict.tags).toEqual([]);
-    expect(edict._tokens).toBeGreaterThan(0);
+    const result = store.add({ text: 'New fact', category: 'Test' });
+    const edict = result.edict;
+    expect(result.action).toBe('created');
+    expect(edict?.id).toBe('e_001');
+    expect(edict?.category).toBe('test');
+    expect(edict?.confidence).toBe('user');
+    expect(edict?.ttl).toBe('durable');
+    expect(edict?.tags).toEqual([]);
+    expect(edict?._tokens).toBeGreaterThan(0);
   });
 
   it('add with key uses key as ID', async () => {
@@ -265,12 +267,12 @@ describe('EdictStore mutations', () => {
     const store = new EdictStore({ path });
     await store.load();
 
-    const edict = store.add({
+    const result = store.add({
       text: 'Product launch',
       category: 'product',
       key: 'product-v2-status',
     });
-    expect(edict.id).toBe('product-v2-status');
+    expect(result.edict?.id).toBe('product-v2-status');
   });
 
   it('sequential IDs increment correctly', async () => {
@@ -281,9 +283,9 @@ describe('EdictStore mutations', () => {
     const e1 = store.add({ text: 'First', category: 'test' });
     const e2 = store.add({ text: 'Second', category: 'test' });
     const e3 = store.add({ text: 'Third', category: 'test' });
-    expect(e1.id).toBe('e_001');
-    expect(e2.id).toBe('e_002');
-    expect(e3.id).toBe('e_003');
+    expect(e1.edict?.id).toBe('e_001');
+    expect(e2.edict?.id).toBe('e_002');
+    expect(e3.edict?.id).toBe('e_003');
   });
 
   it('remove returns true for existing edict', async () => {
@@ -291,7 +293,7 @@ describe('EdictStore mutations', () => {
     const store = new EdictStore({ path });
     await store.load();
     store.add({ text: 'To remove', category: 'test' });
-    expect(store.remove('e_001')).toBe(true);
+    expect(store.remove('e_001')).toMatchObject({ action: 'deleted', found: true });
     expect(store.all()).toHaveLength(0);
   });
 
@@ -299,7 +301,7 @@ describe('EdictStore mutations', () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path });
     await store.load();
-    expect(store.remove('nonexistent')).toBe(false);
+    expect(store.remove('nonexistent')).toMatchObject({ action: 'not_found', found: false, id: 'nonexistent' });
   });
 
   it('update modifies edict fields', async () => {
@@ -308,8 +310,9 @@ describe('EdictStore mutations', () => {
     await store.load();
     store.add({ text: 'Original', category: 'test' });
     const updated = store.update('e_001', { text: 'Updated text', category: 'Product' });
-    expect(updated.text).toBe('Updated text');
-    expect(updated.category).toBe('product');
+    expect(updated.action).toBe('updated');
+    expect(updated.edict?.text).toBe('Updated text');
+    expect(updated.edict?.category).toBe('product');
   });
 
   it('update throws for nonexistent edict', async () => {
