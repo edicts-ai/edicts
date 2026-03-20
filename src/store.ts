@@ -218,7 +218,12 @@ export class EdictStore {
       category: patch.category ?? edict.category,
       confidence: patch.confidence ?? edict.confidence,
       ttl: patch.ttl ?? edict.ttl,
-      expiresAt: patch.expiresAt !== undefined ? patch.expiresAt : edict.expiresAt,
+      expiresAt:
+        patch.expiresIn !== undefined
+          ? undefined
+          : patch.expiresAt !== undefined
+            ? patch.expiresAt
+            : edict.expiresAt,
       expiresIn: patch.expiresIn,
     });
 

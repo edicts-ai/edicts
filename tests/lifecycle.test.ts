@@ -243,4 +243,22 @@ describe('expiresIn resolution', () => {
     expect(new Date(explicit!.expiresAt!).getTime()).toBeGreaterThanOrEqual(before + 7200 * 1000 - 1000);
     expect(new Date(implicit!.expiresAt!).getTime()).toBeLessThanOrEqual(after + 7200 * 1000 + 1000);
   });
+
+  it('updates edict with expiresAt using expiresIn patch', async () => {
+    const store = await makeStore('expires-update-patch');
+    await store.load();
+
+    await store.add({ text: 'Test', category: 'test', expiresAt: '2030-01-01T00:00:00Z' });
+    const before = Date.now();
+    const result = await store.update('e_001', { expiresIn: '2h' });
+    const after = Date.now();
+
+    expect(result.action).toBe('updated');
+    expect(result.edict?.expiresAt).toBeDefined();
+    expect(result.edict?.expiresAt).not.toBe('2030-01-01T00:00:00Z');
+
+    const expiresMs = new Date(result.edict!.expiresAt!).getTime();
+    expect(expiresMs).toBeGreaterThanOrEqual(before + 7200 * 1000 - 1000);
+    expect(expiresMs).toBeLessThanOrEqual(after + 7200 * 1000 + 1000);
+  });
 });
