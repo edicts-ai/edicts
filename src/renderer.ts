@@ -47,6 +47,6 @@ export function renderMarkdown(edicts: Edict[]): string {
  * JSON renderer: clean array of edicts for programmatic consumption.
  */
 export function renderJson(edicts: Edict[]): string {
-  const clean = edicts.map(({ _tokens, ...rest }) => rest);
+  const clean = edicts.map(({ _tokens: _ignored, ...rest }) => rest);
   return JSON.stringify(clean, null, 2);
 }

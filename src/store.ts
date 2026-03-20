@@ -30,6 +30,7 @@ export class EdictStore {
   private _dirty = false;
   private _loaded = false;
   private _sequentialCounter = 0;
+  private _loadWarnings: string[] = [];
 
   private readonly storage: Storage;
   private readonly tokenizer: Tokenizer;
@@ -56,7 +57,7 @@ export class EdictStore {
 
   async load(): Promise<void> {
     const schema = await this.storage.read();
-    validateFileSchema(schema);
+    this._loadWarnings = validateFileSchema(schema);
 
     if (schema.config) {
       this._fileConfig = schema.config;
@@ -99,7 +100,7 @@ export class EdictStore {
         tokenBudget: this.tokenBudget,
         categories: this.categoryAllowlist ?? [],
       },
-      edicts: this._edicts.map(({ _tokens, ...rest }) => rest as Edict),
+      edicts: this._edicts.map(({ _tokens, ...rest }) => rest),
       history: this._history,
     };
 
@@ -165,9 +166,19 @@ export class EdictStore {
     const edict = this._edicts.find((e) => e.id === id);
     if (!edict) throw new EdictNotFoundError(id);
 
+    const previousText = edict.text;
+    const previousTokens = edict._tokens ?? this.tokenizer(edict.text);
+
     if (patch.text !== undefined) {
       edict.text = patch.text;
       edict._tokens = this.tokenizer(patch.text);
+
+      const newTotal = this.tokenCount();
+      if (newTotal > this.tokenBudget) {
+        edict.text = previousText;
+        edict._tokens = previousTokens;
+        throw new EdictBudgetExceededError(this.tokenBudget, newTotal);
+      }
     }
     if (patch.category !== undefined) {
       edict.category = normalizeCategory(patch.category);
@@ -256,6 +267,10 @@ export class EdictStore {
     return this._fileHash ?? '';
   }
 
+  get loadWarnings(): string[] {
+    return [...this._loadWarnings];
+  }
+
   private _supersede(
     existingIdx: number,
     input: EdictInput,
@@ -264,11 +279,20 @@ export class EdictStore {
     now: string
   ): Edict {
     const existing = this._edicts[existingIdx];
+    const previousText = existing.text;
+    const previousCategory = existing.category;
+    const previousTags = [...existing.tags];
+    const previousConfidence = existing.confidence;
+    const previousSource = existing.source;
+    const previousTtl = existing.ttl;
+    const previousExpiresAt = existing.expiresAt;
+    const previousUpdated = existing.updated;
+    const previousTokens = existing._tokens ?? this.tokenizer(existing.text);
 
     const historyId = `${existing.id}__${now.slice(0, 10).replace(/-/g, '')}`;
     this._history.push({
       id: historyId,
-      text: existing.text,
+      text: previousText,
       supersededBy: existing.id,
       archivedAt: now,
     });
@@ -282,6 +306,21 @@ export class EdictStore {
     existing.expiresAt = input.expiresAt;
     existing.updated = now;
     existing._tokens = this.tokenizer(input.text);
+
+    const newTotal = this.tokenCount();
+    if (newTotal > this.tokenBudget) {
+      existing.text = previousText;
+      existing.category = previousCategory;
+      existing.tags = previousTags;
+      existing.confidence = previousConfidence;
+      existing.source = previousSource;
+      existing.ttl = previousTtl;
+      existing.expiresAt = previousExpiresAt;
+      existing.updated = previousUpdated;
+      existing._tokens = previousTokens;
+      this._history.pop();
+      throw new EdictBudgetExceededError(this.tokenBudget, newTotal);
+    }
 
     this._dirty = true;
     return existing;
@@ -301,6 +340,7 @@ export class EdictStore {
   private _computeNextSequential(): number {
     let max = 0;
     for (const edict of this._edicts) {
+      if (!edict.id) continue;
       const match = edict.id.match(/^e_(\d+)$/);
       if (match) {
         max = Math.max(max, parseInt(match[1], 10));

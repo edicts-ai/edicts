@@ -101,6 +101,8 @@ export interface EdictStoreOptions {
 /**
  * Internal file structure matching YAML/JSON on disk.
  */
+export type StoredEdict = Omit<Edict, '_tokens'>;
+
 export interface EdictFileSchema {
   version: number;
   config: {
@@ -108,6 +110,6 @@ export interface EdictFileSchema {
     tokenBudget: number;
     categories: string[];
   };
-  edicts: Edict[];
+  edicts: StoredEdict[];
   history: HistoryEntry[];
 }

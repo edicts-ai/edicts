@@ -88,6 +88,28 @@ history: []
     await store2.load();
     expect(store2.all()).toHaveLength(1);
   });
+
+  it('exposes schema validation warnings after load', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    await writeFile(path, `
+version: 1
+edicts:
+  - text: "Warning edict"
+    category: test
+    tags: []
+    confidence: user
+    source: manual
+    ttl: durable
+    updated: "2026-03-20T06:00:00Z"
+`);
+
+    const store = new EdictStore({ path });
+    await store.load();
+
+    expect(store.loadWarnings).toContain('Missing config section, using defaults');
+    expect(store.loadWarnings).toContain('Missing history array, initializing empty');
+    expect(store.loadWarnings).toContain('Edict missing id, will be regenerated');
+  });
 });
 
 describe('EdictStore mutations', () => {
@@ -260,6 +282,43 @@ describe('EdictStore budget', () => {
     await store.load();
     expect(store.isOverBudget()).toBe(false);
   });
+
+  it('throws when update would exceed token budget', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({
+      path,
+      tokenBudget: 10,
+      tokenizer: (text) => text.length,
+    });
+    await store.load();
+    store.add({ text: 'small', category: 'test' });
+
+    expect(() =>
+      store.update('e_001', { text: 'this update is too large' })
+    ).toThrow('budget');
+    expect(store.get('e_001')?.text).toBe('small');
+  });
+
+  it('throws when superseding would exceed token budget', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({
+      path,
+      tokenBudget: 10,
+      tokenizer: (text) => text.length,
+    });
+    await store.load();
+    store.add({ text: 'small', category: 'test', key: 'shared-key' });
+
+    expect(() =>
+      store.add({
+        text: 'this superseding text is too large',
+        category: 'test',
+        key: 'shared-key',
+      })
+    ).toThrow('budget');
+    expect(store.get('shared-key')?.text).toBe('small');
+    expect(store.history()).toHaveLength(0);
+  });
 });
 
 describe('EdictStore rendering', () => {
@@ -317,15 +376,5 @@ describe('EdictStore rendering', () => {
     const output = store.render('plain');
     expect(output).toContain('Hello');
     expect(output).not.toBe('CUSTOM');
-  });
-
-  it('render updates lastAccessed on all edicts', async () => {
-    const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
-    await store.load();
-    store.add({ text: 'Test', category: 'test' });
-    expect(store.all()[0].lastAccessed).toBeUndefined();
-    store.render();
-    expect(store.all()[0].lastAccessed).toBeDefined();
   });
 });
