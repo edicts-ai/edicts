@@ -199,11 +199,13 @@ export class EdictStore {
   async remove(id: string): Promise<MutationResult> {
     const pruned = await this._autoPrune();
     const idx = this._edicts.findIndex((e) => e.id === id);
-    if (idx === -1) return { action: 'not_found', found: false, id, pruned };
+    if (idx === -1) {
+      return this._buildMutationResult('not_found', undefined, pruned, { found: false, id });
+    }
     const [removed] = this._edicts.splice(idx, 1);
     this._dirty = true;
     if (this.autoSave) await this.save();
-    return { action: 'deleted', found: true, edict: structuredClone(removed), pruned };
+    return this._buildMutationResult('deleted', removed, pruned, { found: true });
   }
 
   async update(id: string, patch: Partial<EdictInput>): Promise<MutationResult> {
@@ -694,7 +696,9 @@ export class EdictStore {
     return [...groups.entries()]
       .filter(([, edicts]) => edicts.length >= 2)
       .map(([groupKey, edicts]) => {
-        const [category, keyPrefix] = groupKey.split('::');
+        const separatorIndex = groupKey.indexOf('::');
+        const category = separatorIndex === -1 ? groupKey : groupKey.slice(0, separatorIndex);
+        const keyPrefix = separatorIndex === -1 ? '' : groupKey.slice(separatorIndex + 2);
         return { keyPrefix, category, edicts: structuredClone(edicts) };
       });
   }
@@ -714,13 +718,15 @@ export class EdictStore {
   private _buildMutationResult(
     action: MutationResult['action'],
     edict: Edict | undefined,
-    pruned: number
+    pruned: number,
+    extra: Partial<MutationResult> = {}
   ): MutationResult {
     const warnings = this.capacityStatus().warnings;
     return {
       action,
       edict: edict ? structuredClone(edict) : undefined,
       pruned,
+      ...extra,
       warnings: warnings.length > 0 ? warnings : undefined,
     };
   }

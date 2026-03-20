@@ -21,10 +21,10 @@ afterEach(async () => {
 describe('EdictStore CRUD programmatic API', () => {
   it('add returns a structured result for created edicts', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    const result = store.add({ text: 'Alpha fact', category: 'product' });
+    const result = await store.add({ text: 'Alpha fact', category: 'product' });
 
     expect(result).toMatchObject({
       action: 'created',
@@ -39,38 +39,38 @@ describe('EdictStore CRUD programmatic API', () => {
 
   it('add with an existing key returns a structured superseded result', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    store.add({ text: 'First version', category: 'product', key: 'shared' });
-    const result = store.add({ text: 'Second version', category: 'product', key: 'shared' });
+    await store.add({ text: 'First version', category: 'product', key: 'shared' });
+    const result = await store.add({ text: 'Second version', category: 'product', key: 'shared' });
 
     expect(result.action).toBe('superseded');
-    expect(result.edict.text).toBe('Second version');
-    expect(store.history()).toHaveLength(1);
+    expect(result.edict?.text).toBe('Second version');
+    expect(await store.history()).toHaveLength(1);
   });
 
   it('remove returns a structured result for deleted edicts', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    const created = store.add({ text: 'To remove', category: 'test' });
+    const created = await store.add({ text: 'To remove', category: 'test' });
 
-    const result = store.remove(created.edict.id);
+    const result = await store.remove(created.edict!.id);
 
     expect(result).toMatchObject({
       action: 'deleted',
       found: true,
-      edict: { id: created.edict.id, text: 'To remove' },
+      edict: { id: created.edict!.id, text: 'To remove' },
     });
   });
 
   it('remove returns a structured result for missing edicts', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
-    const result = store.remove('missing');
+    const result = await store.remove('missing');
 
     expect(result).toEqual({
       action: 'not_found',
@@ -82,56 +82,56 @@ describe('EdictStore CRUD programmatic API', () => {
 
   it('update returns a structured result for updated edicts', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    const created = store.add({ text: 'Original', category: 'test' });
+    const created = await store.add({ text: 'Original', category: 'test' });
 
-    const result = store.update(created.edict.id, { text: 'Updated' });
+    const result = await store.update(created.edict!.id, { text: 'Updated' });
 
     expect(result).toMatchObject({
       action: 'updated',
-      edict: { id: created.edict.id, text: 'Updated' },
+      edict: { id: created.edict!.id, text: 'Updated' },
       pruned: 0,
     });
   });
 
   it('find supports object filters by category, tag, key, confidence, ttl, and text query', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Launch checklist', category: 'Product', tags: ['Launch'], key: 'launch', confidence: 'verified', ttl: 'durable' });
-    store.add({ text: 'Team standup', category: 'Team', tags: ['Internal'], confidence: 'user', ttl: 'event' });
+    await store.add({ text: 'Launch checklist', category: 'Product', tags: ['Launch'], key: 'launch', confidence: 'verified', ttl: 'durable' });
+    await store.add({ text: 'Team standup', category: 'Team', tags: ['Internal'], confidence: 'user', ttl: 'event' });
 
-    expect(store.find({ category: 'products' })).toHaveLength(1);
-    expect(store.find({ tag: 'launches' })).toHaveLength(1);
-    expect(store.find({ key: 'launch' })).toHaveLength(1);
-    expect(store.find({ confidence: 'verified' })).toHaveLength(1);
-    expect(store.find({ ttl: 'event' })).toHaveLength(1);
-    expect(store.find({ text: 'checklist' })).toHaveLength(1);
+    expect(await store.find({ category: 'products' })).toHaveLength(1);
+    expect(await store.find({ tag: 'launches' })).toHaveLength(1);
+    expect(await store.find({ key: 'launch' })).toHaveLength(1);
+    expect(await store.find({ confidence: 'verified' })).toHaveLength(1);
+    expect(await store.find({ ttl: 'event' })).toHaveLength(1);
+    expect(await store.find({ text: 'checklist' })).toHaveLength(1);
   });
 
   it('search finds text across text, category, tags, source, and key', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'Casper launch plan', category: 'product', tags: ['roadmap'], source: 'pm-notes', key: 'launch-plan' });
-    store.add({ text: 'Engineering sync', category: 'team', tags: ['internal'], source: 'calendar' });
+    await store.add({ text: 'Casper launch plan', category: 'product', tags: ['roadmap'], source: 'pm-notes', key: 'launch-plan' });
+    await store.add({ text: 'Engineering sync', category: 'team', tags: ['internal'], source: 'calendar' });
 
-    expect(store.search('casper')).toHaveLength(1);
-    expect(store.search('roadmap')).toHaveLength(1);
-    expect(store.search('pm-notes')).toHaveLength(1);
-    expect(store.search('launch-plan')).toHaveLength(1);
-    expect(store.search('team')).toHaveLength(1);
+    expect(await store.search('casper')).toHaveLength(1);
+    expect(await store.search('roadmap')).toHaveLength(1);
+    expect(await store.search('pm-notes')).toHaveLength(1);
+    expect(await store.search('launch-plan')).toHaveLength(1);
+    expect(await store.search('team')).toHaveLength(1);
   });
 
   it('stats returns totals and grouped counts', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    store.add({ text: 'A', category: 'product', tags: ['launch'], confidence: 'verified' });
-    store.add({ text: 'B', category: 'team', tags: ['internal'], confidence: 'user', ttl: 'event' });
+    await store.add({ text: 'A', category: 'product', tags: ['launch'], confidence: 'verified' });
+    await store.add({ text: 'B', category: 'team', tags: ['internal'], confidence: 'user', ttl: 'event' });
 
-    expect(store.stats()).toMatchObject({
+    expect(await store.stats()).toMatchObject({
       total: 2,
       history: 0,
       byCategory: { product: 1, team: 1 },
@@ -143,36 +143,36 @@ describe('EdictStore CRUD programmatic API', () => {
 
   it('exportData strips internal _tokens and importData restores store state', async () => {
     const pathA = join(tempDir, 'edicts-a.yaml');
-    const storeA = new EdictStore({ path: pathA });
+    const storeA = new EdictStore({ path: pathA, autoSave: false });
     await storeA.load();
-    storeA.add({ text: 'Export me', category: 'product' });
+    await storeA.add({ text: 'Export me', category: 'product' });
 
     const exported = storeA.exportData();
     expect(exported.edicts[0]).not.toHaveProperty('_tokens');
 
     const pathB = join(tempDir, 'edicts-b.yaml');
-    const storeB = new EdictStore({ path: pathB });
+    const storeB = new EdictStore({ path: pathB, autoSave: false });
     await storeB.load();
-    const result = storeB.importData(exported);
+    const result = await storeB.importData(exported);
 
     expect(result).toMatchObject({ imported: 1, historyImported: 0, pruned: 0 });
-    expect(storeB.all()).toHaveLength(1);
-    expect(storeB.get('e_001')?.text).toBe('Export me');
+    expect(await storeB.all()).toHaveLength(1);
+    expect((await storeB.get('e_001'))?.text).toBe('Export me');
   });
 
   it('auto-prunes expired edicts on mutation and reports prune count', async () => {
     const path = join(tempDir, 'edicts.yaml');
-    const store = new EdictStore({ path });
+    const store = new EdictStore({ path, autoSave: false });
     await store.load();
 
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    store.add({ text: 'Old event', category: 'team', ttl: 'event', expiresAt: yesterday });
+    await store.add({ text: 'Old event', category: 'team', ttl: 'event', expiresAt: yesterday });
 
-    const result = store.add({ text: 'Fresh fact', category: 'team' });
+    const result = await store.add({ text: 'Fresh fact', category: 'team' });
 
     expect(result.pruned).toBe(1);
-    expect(store.all().map((e) => e.text)).toEqual(['Fresh fact']);
-    expect(store.history()).toHaveLength(1);
+    expect((await store.all()).map((e) => e.text)).toEqual(['Fresh fact']);
+    expect(await store.history()).toHaveLength(1);
   });
 });
 

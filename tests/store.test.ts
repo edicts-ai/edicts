@@ -26,7 +26,7 @@ describe('EdictStore lifecycle', () => {
     const store2 = new EdictStore({ path, autoSave: false });
     await store2.load();
     expect(await store2.all()).toHaveLength(1);
-    expect(await store2.all()[0].text).toBe('Test edict');
+    expect((await store2.all())[0].text).toBe('Test edict');
   });
 
   it('loads existing YAML file', async () => {
@@ -52,7 +52,7 @@ history: []
     const store = new EdictStore({ path, autoSave: false });
     await store.load();
     expect(await store.all()).toHaveLength(1);
-    expect(await store.get('existing')?.text).toBe('Pre-existing edict');
+    expect((await store.get('existing'))?.text).toBe('Pre-existing edict');
   });
 
   it('uses JSON format when extension is .json', async () => {
@@ -96,13 +96,13 @@ history: []
 
     await store.add({ text: 'Original text', category: 'product', tags: ['stable'] });
 
-    expect(() =>
-      await store.update('e_001', {
+    await expect(
+      store.update('e_001', {
         text: 'New text',
         category: 'invalid-category',
         tags: ['changed'],
       })
-    ).toThrow('Unknown category');
+    ).rejects.toThrow('Unknown category');
 
     const edict = await store.get('e_001');
     expect(edict).toMatchObject({
@@ -182,7 +182,7 @@ history: []
     await store.load();
 
     expect(await store.all()).toHaveLength(1);
-    expect(await store.all()[0].id).toBe('e_001');
+    expect((await store.all())[0].id).toBe('e_001');
     expect(store.has('e_001')).toBe(true);
   });
 
@@ -214,8 +214,8 @@ history: []
 
     const reloaded = new EdictStore({ path, autoSave: false });
     await reloaded.load();
-    expect(reloaded.all()).toHaveLength(1);
-    expect(reloaded.all()[0].id).toBe('existing');
+    expect(await reloaded.all()).toHaveLength(1);
+    expect((await reloaded.all())[0].id).toBe('existing');
   });
 
   it('persists file config values loaded from disk', async () => {
@@ -319,22 +319,22 @@ describe('EdictStore mutations', () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    expect(() => await store.update('nope', { text: 'Fail' })).toThrow('nope');
+    await expect(store.update('nope', { text: 'Fail' })).rejects.toThrow('nope');
   });
 
   it('rejects invalid input on add', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, autoSave: false });
     await store.load();
-    expect(() => await store.add({ text: '', category: 'test' })).toThrow('text');
+    await expect(store.add({ text: '', category: 'test' })).rejects.toThrow('text');
   });
 
   it('enforces category allowlist', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path, categories: ['product', 'team'] });
     await store.load();
-    expect(() => await store.add({ text: 'Hello', category: 'random' })).toThrow('random');
-    expect(() => await store.add({ text: 'Hello', category: 'Product' })).not.toThrow();
+    await expect(store.add({ text: 'Hello', category: 'random' })).rejects.toThrow('random');
+    await expect(store.add({ text: 'Hello', category: 'Product' })).resolves.toBeDefined();
   });
 });
 
@@ -369,7 +369,7 @@ describe('EdictStore reads', () => {
     await store.add({ text: 'Team fact', category: 'team' });
     await store.add({ text: 'Another product', category: 'product' });
 
-    const products = store.find((e) => e.category === 'product');
+    const products = await store.find((e) => e.category === 'product');
     expect(products).toHaveLength(2);
   });
 
@@ -383,7 +383,7 @@ describe('EdictStore reads', () => {
     const edicts = await store.all();
     edicts[0].text = 'Mutated externally';
 
-    expect(await store.get('e_001')?.text).toBe('Original');
+    expect((await store.get('e_001'))?.text).toBe('Original');
   });
 
   it('find returns cloned edicts', async () => {
@@ -392,10 +392,10 @@ describe('EdictStore reads', () => {
     await store.load();
     await store.add({ text: 'Product fact', category: 'product' });
 
-    const products = store.find((e) => e.category === 'product');
+    const products = await store.find((e) => e.category === 'product');
     products[0].text = 'Mutated externally';
 
-    expect(await store.get('e_001')?.text).toBe('Product fact');
+    expect((await store.get('e_001'))?.text).toBe('Product fact');
   });
 
   it('categories returns sorted unique categories', async () => {
@@ -483,10 +483,10 @@ describe('EdictStore budget', () => {
     await store.load();
     await store.add({ text: 'small', category: 'test' });
 
-    expect(() =>
-      await store.update('e_001', { text: 'this update is too large' })
-    ).toThrow('budget');
-    expect(await store.get('e_001')?.text).toBe('small');
+    await expect(
+      store.update('e_001', { text: 'this update is too large' })
+    ).rejects.toThrow('budget');
+    expect((await store.get('e_001'))?.text).toBe('small');
   });
 
   it('throws when superseding would exceed token budget', async () => {
@@ -499,15 +499,15 @@ describe('EdictStore budget', () => {
     await store.load();
     await store.add({ text: 'small', category: 'test', key: 'shared-key' });
 
-    expect(() =>
-      await store.add({
+    await expect(
+      store.add({
         text: 'this superseding text is too large',
         category: 'test',
         key: 'shared-key',
       })
-    ).toThrow('budget');
-    expect(await store.get('shared-key')?.text).toBe('small');
-    expect(store.history()).toHaveLength(0);
+    ).rejects.toThrow('budget');
+    expect((await store.get('shared-key'))?.text).toBe('small');
+    expect(await store.history()).toHaveLength(0);
   });
 });
 
