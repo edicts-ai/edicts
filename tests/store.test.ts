@@ -89,6 +89,29 @@ history: []
     expect(reread?.tags).toEqual(['one']);
   });
 
+  it('update is atomic when category validation fails after a text patch', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path, categories: ['product'] });
+    await store.load();
+
+    store.add({ text: 'Original text', category: 'product', tags: ['stable'] });
+
+    expect(() =>
+      store.update('e_001', {
+        text: 'New text',
+        category: 'invalid-category',
+        tags: ['changed'],
+      })
+    ).toThrow('Unknown category');
+
+    const edict = store.get('e_001');
+    expect(edict).toMatchObject({
+      text: 'Original text',
+      category: 'product',
+      tags: ['stable'],
+    });
+  });
+
   it('dirty flag tracks unsaved changes', async () => {
     const path = join(tempDir, 'edicts.yaml');
     const store = new EdictStore({ path });

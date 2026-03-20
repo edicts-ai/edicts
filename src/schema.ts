@@ -61,7 +61,7 @@ export function validateFileSchema(schema: EdictFileSchema): string[] {
   for (const edict of schema.edicts) {
     if (!edict.id) warnings.push('Edict missing id, will be regenerated');
     if (!edict.text) warnings.push(`Edict ${edict.id ?? '(unknown)'} missing text`);
-    if (!edict.created) warnings.push(`Edict ${edict.id} missing created timestamp`);
+    if (!edict.created) warnings.push(`Edict ${edict.id ?? '(unknown)'} missing created timestamp`);
   }
 
   return warnings;

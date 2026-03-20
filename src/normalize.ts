@@ -18,6 +18,14 @@ const MIN_STRIP_LENGTH = 4;
 export function normalizeCategory(raw: string): string {
   let value = raw.trim().toLowerCase();
 
+  if (value.length >= MIN_STRIP_LENGTH && value.endsWith('ies')) {
+    return `${value.slice(0, -3)}y`;
+  }
+
+  if (value.length >= MIN_STRIP_LENGTH && /(ches|shes|xes|zes|sses)$/.test(value)) {
+    return value.slice(0, -2);
+  }
+
   if (
     value.length >= MIN_STRIP_LENGTH &&
     value.endsWith('s') &&
@@ -25,6 +33,7 @@ export function normalizeCategory(raw: string): string {
     !value.endsWith('us') &&
     !value.endsWith('is') &&
     !value.endsWith('as') &&
+    !value.endsWith('es') &&
     !NATURAL_S_ENDINGS.has(value)
   ) {
     value = value.slice(0, -1);

@@ -56,6 +56,28 @@ describe('validateFileSchema', () => {
     expect(() => validateFileSchema({} as any)).toThrow('version');
   });
 
+  it('uses (unknown) in created warning when edict id is missing', () => {
+    const schema: EdictFileSchema = {
+      version: 1,
+      config: { maxEdicts: 200, tokenBudget: 4000, categories: [] },
+      edicts: [
+        {
+          text: 'Hello',
+          category: 'test',
+          tags: [],
+          confidence: 'user',
+          source: '',
+          ttl: 'durable',
+          updated: '2026-03-20T06:00:00Z',
+        } as any,
+      ],
+      history: [],
+    };
+
+    const warnings = validateFileSchema(schema);
+    expect(warnings).toContain('Edict (unknown) missing created timestamp');
+  });
+
   it('returns warnings for edicts with missing optional fields', () => {
     const schema: EdictFileSchema = {
       version: 1,

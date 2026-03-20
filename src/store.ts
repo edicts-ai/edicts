@@ -176,32 +176,31 @@ export class EdictStore {
     const edict = this._edicts.find((e) => e.id === id);
     if (!edict) throw new EdictNotFoundError(id);
 
-    const previousText = edict.text;
-    const previousTokens = edict._tokens ?? this.tokenizer(edict.text);
+    const nextText = patch.text ?? edict.text;
+    const nextTokens = patch.text !== undefined ? this.tokenizer(patch.text) : edict._tokens ?? this.tokenizer(edict.text);
+    const nextCategory = patch.category !== undefined ? normalizeCategory(patch.category) : edict.category;
+    const nextTags = patch.tags !== undefined ? normalizeTags(patch.tags) : edict.tags;
+    const nextConfidence = patch.confidence ?? edict.confidence;
+    const nextSource = patch.source ?? edict.source;
+    const nextTtl = patch.ttl ?? edict.ttl;
+    const nextExpiresAt = patch.expiresAt !== undefined ? patch.expiresAt : edict.expiresAt;
 
-    if (patch.text !== undefined) {
-      edict.text = patch.text;
-      edict._tokens = this.tokenizer(patch.text);
+    this._validateCategory(nextCategory);
 
-      const newTotal = this.tokenCount();
-      if (newTotal > this.tokenBudget) {
-        edict.text = previousText;
-        edict._tokens = previousTokens;
-        throw new EdictBudgetExceededError(this.tokenBudget, newTotal);
-      }
+    const currentTokens = edict._tokens ?? this.tokenizer(edict.text);
+    const newTotal = this.tokenCount() - currentTokens + nextTokens;
+    if (newTotal > this.tokenBudget) {
+      throw new EdictBudgetExceededError(this.tokenBudget, newTotal);
     }
-    if (patch.category !== undefined) {
-      edict.category = normalizeCategory(patch.category);
-      this._validateCategory(edict.category);
-    }
-    if (patch.tags !== undefined) {
-      edict.tags = normalizeTags(patch.tags);
-    }
-    if (patch.confidence !== undefined) edict.confidence = patch.confidence;
-    if (patch.source !== undefined) edict.source = patch.source;
-    if (patch.ttl !== undefined) edict.ttl = patch.ttl;
-    if (patch.expiresAt !== undefined) edict.expiresAt = patch.expiresAt;
 
+    edict.text = nextText;
+    edict._tokens = nextTokens;
+    edict.category = nextCategory;
+    edict.tags = nextTags;
+    edict.confidence = nextConfidence;
+    edict.source = nextSource;
+    edict.ttl = nextTtl;
+    edict.expiresAt = nextExpiresAt;
     edict.updated = new Date().toISOString();
     this._dirty = true;
     return edict;
