@@ -76,18 +76,27 @@ export class EdictStore {
     this._edicts = active;
     this._history = [...this._history, ...expired];
 
+    this._sequentialCounter = this._computeNextSequential();
+
     for (const edict of this._edicts) {
+      if (!edict.id) {
+        edict.id = this._nextSequentialId();
+      }
       edict._tokens = this.tokenizer(edict.text);
     }
 
-    this._sequentialCounter = this._computeNextSequential();
     this._fileHash = await this.storage.hash();
     this._dirty = expired.length > 0;
     this._loaded = true;
   }
 
   async save(): Promise<void> {
-    if (this._fileHash !== null) {
+    if (!this._loaded) {
+      const currentHash = await this.storage.hash();
+      if (currentHash !== null) {
+        throw new EdictConflictError('(not loaded)', currentHash);
+      }
+    } else if (this._fileHash !== null) {
       const currentHash = await this.storage.hash();
       if (currentHash !== null && currentHash !== this._fileHash) {
         throw new EdictConflictError(this._fileHash, currentHash);
@@ -97,9 +106,9 @@ export class EdictStore {
     const schema: EdictFileSchema = {
       version: 1,
       config: {
-        maxEdicts: this.maxEdicts,
-        tokenBudget: this.tokenBudget,
-        categories: this.categoryAllowlist ?? [],
+        maxEdicts: this._fileConfig.maxEdicts ?? this.maxEdicts,
+        tokenBudget: this._fileConfig.tokenBudget ?? this.tokenBudget,
+        categories: this._fileConfig.categories ?? this.categoryAllowlist ?? [],
       },
       edicts: this._edicts.map(({ _tokens, ...rest }) => rest),
       history: this._history,
@@ -212,11 +221,11 @@ export class EdictStore {
   }
 
   all(): Edict[] {
-    return [...this._edicts];
+    return this._edicts.map((e) => structuredClone(e));
   }
 
   find(predicate: (e: Edict) => boolean): Edict[] {
-    return this._edicts.filter(predicate);
+    return this._edicts.filter(predicate).map((e) => structuredClone(e));
   }
 
   categories(): string[] {

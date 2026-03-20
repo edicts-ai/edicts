@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   EdictBudgetExceededError,
+  EdictCountLimitError,
   EdictConflictError,
   EdictCategoryError,
   EdictValidationError,
@@ -15,6 +16,15 @@ describe('Error classes', () => {
     expect(err.budget).toBe(4000);
     expect(err.current).toBe(4200);
     expect(err.message).toContain('4000');
+  });
+
+  it('EdictCountLimitError includes limit info', () => {
+    const err = new EdictCountLimitError(10, 10);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe('EdictCountLimitError');
+    expect(err.limit).toBe(10);
+    expect(err.current).toBe(10);
+    expect(err.message).toContain('limit is 10');
   });
 
   it('EdictConflictError includes both versions', () => {

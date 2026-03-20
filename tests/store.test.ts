@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EdictStore } from '../src/store.js';
-import { EdictBudgetExceededError, EdictCountLimitError } from '../src/errors.js';
+import { EdictBudgetExceededError, EdictCountLimitError, EdictConflictError } from '../src/errors.js';
 
 let tempDir: string;
 
@@ -110,6 +110,93 @@ edicts:
     expect(store.loadWarnings).toContain('Missing config section, using defaults');
     expect(store.loadWarnings).toContain('Missing history array, initializing empty');
     expect(store.loadWarnings).toContain('Edict missing id, will be regenerated');
+  });
+
+
+  it('regenerates missing IDs during load', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    await writeFile(path, `
+version: 1
+config:
+  maxEdicts: 200
+  tokenBudget: 4000
+  categories: []
+edicts:
+  - text: "Missing id"
+    category: test
+    tags: []
+    confidence: user
+    source: manual
+    ttl: durable
+    created: "2026-03-20T06:00:00Z"
+    updated: "2026-03-20T06:00:00Z"
+history: []
+`);
+
+    const store = new EdictStore({ path });
+    await store.load();
+
+    expect(store.all()).toHaveLength(1);
+    expect(store.all()[0].id).toBe('e_001');
+    expect(store.has('e_001')).toBe(true);
+  });
+
+  it('throws on save before load when file already exists', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    await writeFile(path, `
+version: 1
+config:
+  maxEdicts: 200
+  tokenBudget: 4000
+  categories: []
+edicts:
+  - id: existing
+    text: "Pre-existing edict"
+    category: test
+    tags: []
+    confidence: user
+    source: manual
+    ttl: durable
+    created: "2026-03-20T06:00:00Z"
+    updated: "2026-03-20T06:00:00Z"
+history: []
+`);
+
+    const store = new EdictStore({ path });
+    store.add({ text: 'New edict', category: 'test' });
+
+    await expect(store.save()).rejects.toBeInstanceOf(EdictConflictError);
+
+    const reloaded = new EdictStore({ path });
+    await reloaded.load();
+    expect(reloaded.all()).toHaveLength(1);
+    expect(reloaded.all()[0].id).toBe('existing');
+  });
+
+  it('persists file config values loaded from disk', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    await writeFile(path, `
+version: 1
+config:
+  maxEdicts: 7
+  tokenBudget: 123
+  categories:
+    - alpha
+    - beta
+edicts: []
+history: []
+`);
+
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Persist config', category: 'alpha' });
+    await store.save();
+
+    const raw = await (await import('node:fs/promises')).readFile(path, 'utf8');
+    expect(raw).toContain('maxEdicts: 7');
+    expect(raw).toContain('tokenBudget: 123');
+    expect(raw).toContain('- alpha');
+    expect(raw).toContain('- beta');
   });
 });
 
@@ -236,6 +323,31 @@ describe('EdictStore reads', () => {
 
     const products = store.find((e) => e.category === 'product');
     expect(products).toHaveLength(2);
+  });
+
+
+  it('all returns cloned edicts', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Original', category: 'test' });
+
+    const edicts = store.all();
+    edicts[0].text = 'Mutated externally';
+
+    expect(store.get('e_001')?.text).toBe('Original');
+  });
+
+  it('find returns cloned edicts', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Product fact', category: 'product' });
+
+    const products = store.find((e) => e.category === 'product');
+    products[0].text = 'Mutated externally';
+
+    expect(store.get('e_001')?.text).toBe('Product fact');
   });
 
   it('categories returns sorted unique categories', async () => {
