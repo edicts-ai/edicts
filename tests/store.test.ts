@@ -222,3 +222,110 @@ describe('EdictStore reads', () => {
     expect(store.categories()).toEqual(['product', 'team']);
   });
 });
+
+describe('EdictStore budget', () => {
+  it('tracks token count', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path, tokenBudget: 1000 });
+    await store.load();
+    store.add({ text: 'Hello world', category: 'test' });
+    expect(store.tokenCount()).toBeGreaterThan(0);
+    expect(store.tokenBudgetRemaining()).toBeLessThan(1000);
+  });
+
+  it('throws when token budget exceeded', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path, tokenBudget: 5 });
+    await store.load();
+    expect(() =>
+      store.add({ text: 'a'.repeat(100), category: 'test' })
+    ).toThrow('budget');
+  });
+
+  it('uses custom tokenizer', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({
+      path,
+      tokenBudget: 100,
+      tokenizer: (text) => text.length,
+    });
+    await store.load();
+    store.add({ text: 'hello', category: 'test' });
+    expect(store.tokenCount()).toBe(5);
+  });
+
+  it('isOverBudget returns correct value', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path, tokenBudget: 1000 });
+    await store.load();
+    expect(store.isOverBudget()).toBe(false);
+  });
+});
+
+describe('EdictStore rendering', () => {
+  it('render plain returns formatted text', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Test fact', category: 'product', confidence: 'verified' });
+    const output = store.render('plain');
+    expect(output).toContain('Test fact');
+    expect(output).toContain('verified');
+  });
+
+  it('render markdown groups by category', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Fact A', category: 'product' });
+    store.add({ text: 'Fact B', category: 'team' });
+    const output = store.render('markdown');
+    expect(output).toContain('## product');
+    expect(output).toContain('## team');
+  });
+
+  it('render json returns valid JSON', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Test', category: 'test' });
+    const output = store.render('json');
+    const parsed = JSON.parse(output);
+    expect(parsed).toHaveLength(1);
+  });
+
+  it('custom renderer is used when no format specified', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({
+      path,
+      renderer: (edicts) => edicts.map((e) => `CUSTOM: ${e.text}`).join('|'),
+    });
+    await store.load();
+    store.add({ text: 'Hello', category: 'test' });
+    const output = store.render();
+    expect(output).toBe('CUSTOM: Hello');
+  });
+
+  it('explicit format overrides custom renderer', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({
+      path,
+      renderer: () => 'CUSTOM',
+    });
+    await store.load();
+    store.add({ text: 'Hello', category: 'test' });
+    const output = store.render('plain');
+    expect(output).toContain('Hello');
+    expect(output).not.toBe('CUSTOM');
+  });
+
+  it('render updates lastAccessed on all edicts', async () => {
+    const path = join(tempDir, 'edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    store.add({ text: 'Test', category: 'test' });
+    expect(store.all()[0].lastAccessed).toBeUndefined();
+    store.render();
+    expect(store.all()[0].lastAccessed).toBeDefined();
+  });
+});
