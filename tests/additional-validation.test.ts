@@ -17,6 +17,23 @@ async function makeStore(name: string, options: ConstructorParameters<typeof Edi
   });
 }
 
+async function makeStoreWithPath(
+  name: string,
+  options: ConstructorParameters<typeof EdictStore>[0] = {}
+): Promise<{ store: EdictStore; path: string }> {
+  const dir = await mkdtemp(join(tmpdir(), `edicts-extra-${name}-`));
+  tempDirs.push(dir);
+  const path = join(dir, 'edicts.yaml');
+  return {
+    store: new EdictStore({
+      path,
+      autoSave: false,
+      ...options,
+    }),
+    path,
+  };
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
   tempDirs = [];
@@ -58,10 +75,7 @@ describe('additional validation coverage', () => {
   });
 
   it('render(json) strips internal _tokens from serialized output', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'edicts-extra-render-save-'));
-    tempDirs.push(dir);
-    const path = join(dir, 'edicts.yaml');
-    const store = new EdictStore({ path, autoSave: true });
+    const { store, path } = await makeStoreWithPath('render-save', { autoSave: true });
     await store.load();
     await store.add({ text: 'Persist me', category: 'test' });
 
@@ -74,10 +88,7 @@ describe('additional validation coverage', () => {
   });
 
   it('render(json) persists lastAccessed when autoSave is enabled', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'edicts-extra-render-last-accessed-'));
-    tempDirs.push(dir);
-    const path = join(dir, 'edicts.yaml');
-    const store = new EdictStore({ path, autoSave: true });
+    const { store, path } = await makeStoreWithPath('render-last-accessed', { autoSave: true });
     await store.load();
     await store.add({ text: 'Persist me', category: 'test' });
 

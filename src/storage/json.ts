@@ -1,5 +1,5 @@
 import { readFile, writeFile, rename, access } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { EdictFileSchema } from '../types.js';
 import { DEFAULT_SCHEMA, type Storage } from './base.js';
 
@@ -16,7 +16,7 @@ export class JsonStorage implements Storage {
 
   async write(data: EdictFileSchema): Promise<void> {
     const content = JSON.stringify(data, null, 2) + '\n';
-    const tmpPath = `${this.path}.tmp`;
+    const tmpPath = `${this.path}.${randomUUID()}.tmp`;
     await writeFile(tmpPath, content, 'utf-8');
     await rename(tmpPath, this.path);
   }
