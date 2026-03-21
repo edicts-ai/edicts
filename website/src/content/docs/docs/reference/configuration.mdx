@@ -1,0 +1,80 @@
+---
+title: "Configuration"
+---
+
+## EdictStoreOptions
+
+The `EdictStore` constructor accepts an options object:
+
+```typescript
+const store = new EdictStore(options);
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `path` | `string` | `'./edicts.yaml'` | Path to the edicts file on disk |
+| `format` | `'yaml' \| 'json'` | Inferred from extension | Storage format. Auto-detected from file extension |
+| `maxEdicts` | `number` | `200` | Maximum number of active edicts |
+| `tokenBudget` | `number` | `4000` | Maximum total token budget for all edicts |
+| `tokenizer` | `(text: string) => number` | `chars / 4` | Custom tokenizer function for token counting |
+| `categories` | `string[]` | `[]` (any allowed) | Allowlist of permitted categories. Empty = no restriction |
+| `renderer` | `(edicts: Edict[]) => string` | Built-in renderer | Custom renderer function for `render()` output |
+| `staleThresholdDays` | `number` | `90` | Days before a `durable` edict is flagged as stale in `review()` |
+| `categoryLimits` | `Record<string, number>` | `undefined` | Per-category soft limits. e.g., `{ product: 30, internal: 20 }` |
+| `defaultCategoryLimit` | `number` | `undefined` | Default soft limit for categories not in `categoryLimits` |
+| `defaultEphemeralTtlSeconds` | `number` | `86400` (24h) | Default TTL for ephemeral edicts with no explicit expiry |
+| `autoSave` | `boolean` | `true` | Auto-save after mutations and prune operations |
+
+## Example configurations
+
+### Minimal (defaults)
+
+```typescript
+const store = new EdictStore();
+// Uses ./edicts.yaml, 200 max edicts, 4K token budget
+```
+
+### Lightweight cron agent
+
+```typescript
+const store = new EdictStore({
+  path: '/shared/edicts.yaml',
+  tokenBudget: 1000,
+  maxEdicts: 50,
+  autoSave: false, // Read-only for cron agents
+});
+```
+
+### Full agent session
+
+```typescript
+const store = new EdictStore({
+  path: './edicts.yaml',
+  tokenBudget: 4000,
+  maxEdicts: 200,
+  categories: ['product', 'compliance', 'operations', 'team'],
+  categoryLimits: { product: 50, compliance: 30 },
+  staleThresholdDays: 60,
+});
+```
+
+### JSON storage
+
+```typescript
+const store = new EdictStore({
+  path: './edicts.json',
+  // format auto-detected from .json extension
+});
+```
+
+### Custom tokenizer
+
+```typescript
+import { encode } from 'gpt-tokenizer';
+
+const store = new EdictStore({
+  tokenizer: (text) => encode(text).length,
+});
+```

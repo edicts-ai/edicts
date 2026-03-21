@@ -1,0 +1,33 @@
+---
+---
+
+<section class="py-20 border-t border-border-subtle">
+  <div class="max-w-3xl mx-auto px-6">
+    <h2 class="text-2xl sm:text-3xl font-bold text-center mb-12">Where Edicts fits</h2>
+
+    <div class="max-w-lg mx-auto">
+      <svg viewBox="0 0 400 220" class="w-full" xmlns="http://www.w3.org/2000/svg">
+        <!-- Top layer: Full context -->
+        <rect x="20" y="10" width="360" height="55" rx="8" fill="#13131a" stroke="#2a2a35" stroke-width="1"/>
+        <text x="200" y="35" text-anchor="middle" fill="#9494a0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Full Context (MEMORY.md, SOUL.md, LCM)</text>
+        <text x="200" y="52" text-anchor="middle" fill="#9494a0" font-family="Inter, system-ui, sans-serif" font-size="11">~4K–20K tokens</text>
+
+        <!-- Middle layer: Edicts (highlighted) -->
+        <rect x="20" y="80" width="360" height="55" rx="8" fill="rgba(212, 168, 67, 0.08)" stroke="#d4a843" stroke-width="1.5"/>
+        <text x="200" y="105" text-anchor="middle" fill="#d4a843" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="700">Edicts (verified ground truth)</text>
+        <text x="200" y="122" text-anchor="middle" fill="#d4a843" font-family="Inter, system-ui, sans-serif" font-size="11">~200–4K tokens</text>
+        <!-- "you are here" marker -->
+        <text x="370" y="108" text-anchor="end" fill="#d4a843" font-family="Inter, system-ui, sans-serif" font-size="9">← you are here</text>
+
+        <!-- Bottom layer: No context -->
+        <rect x="20" y="150" width="360" height="55" rx="8" fill="#13131a" stroke="#2a2a35" stroke-width="1"/>
+        <text x="200" y="175" text-anchor="middle" fill="#9494a0" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">No context (raw LLM)</text>
+        <text x="200" y="192" text-anchor="middle" fill="#f87171" font-family="Inter, system-ui, sans-serif" font-size="11">0 tokens — hallucination territory</text>
+      </svg>
+    </div>
+
+    <p class="text-center text-text-secondary text-sm mt-8">
+      Cheap enough for every session. Reliable enough for every fact.
+    </p>
+  </div>
+</section>

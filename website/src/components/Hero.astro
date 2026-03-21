@@ -1,0 +1,55 @@
+---
+---
+
+<section class="py-24 sm:py-32 lg:py-40">
+  <div class="max-w-4xl mx-auto px-6 text-center">
+    <!-- Headline -->
+    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
+      Declare what's true.<br />
+      <span class="text-accent">Your agents will follow.</span>
+    </h1>
+
+    <!-- Subheadline -->
+    <p class="mt-6 text-lg sm:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed">
+      Ground truth for AI agents — verified facts in 12 tokens, not 12,000 tokens of context window.
+    </p>
+
+    <!-- CTAs -->
+    <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a
+        href="/docs/getting-started/installation/"
+        class="inline-flex items-center gap-2 px-6 py-3 bg-accent text-bg-primary font-semibold rounded-lg hover:bg-accent-hover transition-colors text-sm"
+      >
+        Get Started
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a
+        href="https://github.com/mssteuer/edicts"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-2 px-6 py-3 border border-border-subtle text-text-primary font-semibold rounded-lg hover:border-text-secondary hover:bg-bg-surface transition-colors text-sm"
+      >
+        GitHub
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
+      </a>
+    </div>
+
+    <!-- Code example -->
+    <div class="mt-16 text-left max-w-lg mx-auto">
+      <div class="bg-code-bg border border-border-subtle rounded-lg overflow-hidden">
+        <div class="px-4 py-2 border-b border-border-subtle flex items-center justify-between">
+          <span class="text-xs text-text-secondary font-mono">edicts.yaml</span>
+          <span class="text-xs text-text-secondary">47 tokens</span>
+        </div>
+        <pre class="p-4 text-sm leading-relaxed overflow-x-auto"><code class="text-text-primary"><span class="text-text-secondary"># edicts.yaml — 47 tokens total</span>
+<span class="text-accent">edicts</span>:
+  - <span class="text-accent">id</span>: launch_date
+    <span class="text-accent">text</span>: <span class="text-success">"Product v2.0 launches April 15, NOT before."</span>
+    <span class="text-accent">category</span>: product
+    <span class="text-accent">confidence</span>: verified
+    <span class="text-accent">ttl</span>: event
+    <span class="text-accent">expiresAt</span>: <span class="text-success">"2025-04-16"</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>

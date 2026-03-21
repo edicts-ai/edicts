@@ -1,0 +1,72 @@
+---
+title: "Installation"
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Requirements
+
+- **Node.js** ≥ 20
+- **TypeScript** (recommended, but not required)
+
+## Install
+
+<Tabs>
+  <TabItem label="npm">
+    ```bash
+    npm install edicts
+    ```
+  </TabItem>
+  <TabItem label="yarn">
+    ```bash
+    yarn add edicts
+    ```
+  </TabItem>
+  <TabItem label="pnpm">
+    ```bash
+    pnpm add edicts
+    ```
+  </TabItem>
+</Tabs>
+
+## Create your first edicts file
+
+Create `edicts.yaml` in your project root:
+
+```yaml
+version: 1
+config:
+  maxEdicts: 200
+  tokenBudget: 4000
+  categories: []
+edicts:
+  - id: e_001
+    text: "Product v2.0 launches April 15, NOT before."
+    category: product
+    tags: []
+    confidence: verified
+    source: manual
+    ttl: event
+    expiresAt: "2025-04-16T00:00:00.000Z"
+    created: "2025-03-20T00:00:00.000Z"
+    updated: "2025-03-20T00:00:00.000Z"
+history: []
+```
+
+## Verify
+
+Use the CLI to confirm everything works:
+
+```bash
+npx edicts list
+```
+
+You should see your edict listed:
+
+```
+e_001  [product]  Product v2.0 launches April 15, NOT before.  (verified, event)
+```
+
+## Next steps
+
+Head to the [Quick Start](/docs/getting-started/quick-start/) to add edicts programmatically and render them into your agent's prompt.

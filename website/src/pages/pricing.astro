@@ -1,0 +1,69 @@
+---
+import Marketing from '../layouts/Marketing.astro';
+
+const faqs = [
+  {
+    q: 'Is there a hosted version?',
+    a: "No. It's a file on disk. That's the point. Your ground truth lives next to your agent, not on someone else's server.",
+  },
+  {
+    q: 'Do I need OpenClaw?',
+    a: 'No. Edicts is framework-agnostic — a standalone TypeScript library. OpenClaw has a first-party plugin for automatic prompt injection, but Edicts works with any agent framework.',
+  },
+  {
+    q: 'What about enterprise or support?',
+    a: "Open an issue on GitHub. It's MIT licensed. If you need consulting on agent architecture, reach out — but the library itself is and will remain free.",
+  },
+];
+---
+
+<Marketing title="Pricing — Edicts" description="Free. Open source. MIT licensed.">
+  <div class="py-24 sm:py-32">
+    <div class="max-w-2xl mx-auto px-6 text-center">
+      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold">Free. Open source.<br />MIT licensed.</h1>
+
+      <p class="mt-8 text-lg text-text-secondary leading-relaxed">
+        Edicts is a standalone TypeScript library.<br />
+        Install it, use it, ship it. No accounts, no API keys, no usage limits.
+      </p>
+
+      <p class="mt-4 text-sm text-text-secondary">
+        Part of the <a href="https://openclaw.ai" target="_blank" rel="noopener" class="text-accent hover:text-accent-hover transition-colors">OpenClaw</a> ecosystem — but works with any agent framework.
+      </p>
+
+      {/* CTAs */}
+      <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div class="bg-code-bg border border-border-subtle rounded-lg px-5 py-3 font-mono text-sm text-text-primary">
+          npm install edicts
+        </div>
+        <a
+          href="https://github.com/mssteuer/edicts"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-2 px-5 py-3 border border-border-subtle text-text-primary font-semibold rounded-lg hover:border-text-secondary hover:bg-bg-surface transition-colors text-sm"
+        >
+          View on GitHub
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
+        </a>
+      </div>
+    </div>
+
+    {/* FAQ */}
+    <div class="max-w-2xl mx-auto px-6 mt-20">
+      <h2 class="text-xl font-bold text-center mb-8">FAQ</h2>
+      <div class="space-y-4">
+        {faqs.map((faq) => (
+          <details class="bg-bg-surface border border-border-subtle rounded-lg group">
+            <summary class="px-6 py-4 cursor-pointer text-text-primary font-medium text-sm flex items-center justify-between hover:text-accent transition-colors">
+              {faq.q}
+              <svg class="w-4 h-4 text-text-secondary group-open:rotate-180 transition-transform shrink-0 ml-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+            </summary>
+            <div class="px-6 pb-4 text-text-secondary text-sm leading-relaxed">
+              {faq.a}
+            </div>
+          </details>
+        ))}
+      </div>
+    </div>
+  </div>
+</Marketing>

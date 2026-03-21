@@ -1,0 +1,301 @@
+---
+title: "API Reference"
+---
+
+## EdictStore
+
+The main class for managing edicts.
+
+```typescript
+import { EdictStore } from 'edicts';
+
+const store = new EdictStore(options?: EdictStoreOptions);
+```
+
+See [Configuration](/docs/reference/configuration/) for all options.
+
+---
+
+## Methods
+
+### `load()`
+
+Load edicts from disk. Must be called before any operations.
+
+```typescript
+await store.load();
+```
+
+Expired edicts are automatically pruned during load.
+
+---
+
+### `save()`
+
+Persist current state to disk. Uses atomic writes (write to temp file, then rename).
+
+```typescript
+await store.save();
+```
+
+Called automatically after mutations when `autoSave: true` (default).
+
+---
+
+### `add(input: EdictInput)`
+
+Add a new edict. If an edict with the same `key` exists, the old one is superseded.
+
+```typescript
+const result = await store.add({
+  text: 'Product v2.0 launches April 15, NOT before.',
+  category: 'product',
+  confidence: 'verified',
+  ttl: 'event',
+  expiresAt: '2025-04-16',
+});
+
+// result.action: 'created' | 'superseded'
+// result.id: 'e_001'
+// result.edict: Edict
+// result.pruned: number (expired edicts cleaned up)
+```
+
+**EdictInput fields:**
+
+| Field | Type | Required | Default |
+|-------|------|----------|---------|
+| `text` | `string` | ✅ | — |
+| `category` | `string` | ✅ | — |
+| `key` | `string` | Optional | — |
+| `tags` | `string[]` | Optional | `[]` |
+| `confidence` | `'verified' \| 'inferred' \| 'user'` | Optional | `'user'` |
+| `source` | `string` | Optional | `'manual'` |
+| `ttl` | `'ephemeral' \| 'event' \| 'durable' \| 'permanent'` | Optional | `'durable'` |
+| `expiresAt` | `string` (ISO 8601) | Optional | — |
+| `expiresIn` | `string \| number` | Optional | — |
+
+---
+
+### `update(id: string, patch: Partial<EdictInput>)`
+
+Update an existing edict by ID. Only provided fields are changed.
+
+```typescript
+const result = await store.update('e_001', {
+  text: 'Product v2.0 launches April 20 (delayed).',
+  expiresAt: '2025-04-21',
+});
+
+// result.action: 'updated' | 'not_found'
+```
+
+---
+
+### `remove(id: string)`
+
+Remove an edict. Moves it to history.
+
+```typescript
+const result = await store.remove('e_001');
+
+// result.action: 'deleted' | 'not_found'
+```
+
+---
+
+### `get(id: string)`
+
+Get a single edict by ID. Updates `lastAccessed`.
+
+```typescript
+const edict = await store.get('e_001');
+// Returns Edict | undefined
+```
+
+---
+
+### `all()`
+
+Get all active (non-expired) edicts.
+
+```typescript
+const edicts = await store.all();
+// Returns Edict[]
+```
+
+---
+
+### `find(predicate)`
+
+Find edicts matching a predicate function or query object.
+
+```typescript
+// Function predicate
+const results = await store.find(e => e.category === 'product');
+
+// Query object
+const results = await store.find({
+  category: 'product',
+  confidence: 'verified',
+  ttl: 'permanent',
+});
+```
+
+**FindQuery fields:** `id`, `key`, `category`, `tag`, `confidence`, `ttl`, `text` (substring match).
+
+---
+
+### `search(query: string)`
+
+Search edicts by text content (case-insensitive substring match across text, category, tags, source, and key).
+
+```typescript
+const results = await store.search('launch');
+// Returns Edict[]
+```
+
+---
+
+### `render(format?: 'plain' | 'markdown' | 'json')`
+
+Render all active edicts as a formatted string. Updates `lastAccessed` on all edicts.
+
+```typescript
+const output = await store.render();          // Default: markdown
+const plain = await store.render('plain');
+const json = await store.render('json');
+```
+
+**Markdown output:**
+```markdown
+## Edicts
+
+- **[product]** Product v2.0 launches April 15, NOT before. *(verified, event — expires 2025-04-16)*
+```
+
+**Plain output:**
+```
+Edicts:
+[product] Product v2.0 launches April 15, NOT before. (verified, event — expires 2025-04-16)
+```
+
+**JSON output:**
+```json
+[{"id":"e_001","text":"Product v2.0 launches April 15, NOT before.","category":"product",...}]
+```
+
+If a custom `renderer` was provided in options, it's used instead (ignoring the format parameter).
+
+---
+
+### `stats()`
+
+Get statistics about the current store.
+
+```typescript
+const stats = await store.stats();
+```
+
+**Returns `EdictStats`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total` | `number` | Active edict count |
+| `history` | `number` | History entry count |
+| `tokenCount` | `number` | Total tokens used |
+| `tokenBudget` | `number` | Configured budget |
+| `tokenBudgetRemaining` | `number` | Budget minus usage |
+| `byCategory` | `Record<string, number>` | Count per category |
+| `byConfidence` | `Record<string, number>` | Count per confidence level |
+| `byTtl` | `Record<string, number>` | Count per TTL type |
+| `byTag` | `Record<string, number>` | Count per tag |
+
+---
+
+### `review(options?: ReviewOptions)`
+
+Analyze store health. Identifies stale edicts, upcoming expirations, capacity issues, and compaction candidates.
+
+```typescript
+const review = await store.review({ expiryLookaheadDays: 7 });
+```
+
+**Returns `ReviewResult`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `stale` | `Edict[]` | Durable edicts past `staleThresholdDays` |
+| `expiringSoon` | `Edict[]` | Edicts expiring within lookahead window |
+| `capacity` | `CapacityStatus` | Current capacity status with warnings |
+| `compactionCandidates` | `CompactionGroup[]` | Groups of edicts with same key prefix + category |
+
+---
+
+### `compact(group: CompactionGroup, merged: EdictInput)`
+
+Merge multiple edicts (from a compaction group) into a single edict.
+
+```typescript
+const review = await store.review();
+for (const group of review.compactionCandidates) {
+  await store.compact(group, {
+    text: 'Merged: ' + group.edicts.map(e => e.text).join('; '),
+    category: group.category,
+  });
+}
+```
+
+---
+
+### `importData(data: EdictFileSchema)`
+
+Import edicts from another store's file format. Merges with existing data.
+
+```typescript
+import { readFileSync } from 'fs';
+import { parse } from 'yaml';
+
+const external = parse(readFileSync('./other-edicts.yaml', 'utf8'));
+const result = await store.importData(external);
+
+// result.imported: number
+// result.historyImported: number
+// result.pruned: number
+```
+
+---
+
+## Return types
+
+### MutationResult
+
+Returned by `add()`, `update()`, `remove()`, and `compact()`:
+
+```typescript
+interface MutationResult {
+  action: 'created' | 'updated' | 'deleted' | 'superseded' | 'not_found';
+  found?: boolean;
+  id?: string;
+  edict?: Edict;
+  pruned: number;
+  warnings?: string[];
+}
+```
+
+### CapacityStatus
+
+Part of `ReviewResult`:
+
+```typescript
+interface CapacityStatus {
+  countUsage: number;
+  tokenUsage: number;
+  categories: Record<string, {
+    count: number;
+    limit?: number;
+    overLimit: boolean;
+  }>;
+  warnings: string[];
+}
+```

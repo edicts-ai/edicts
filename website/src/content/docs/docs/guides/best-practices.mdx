@@ -1,0 +1,136 @@
+---
+title: "Best Practices"
+---
+
+## Write assertions, not instructions
+
+Edicts declare what is true. They don't tell agents what to do.
+
+```yaml
+# ✅ Good — states a fact
+- text: "Product v2.0 launches April 15, NOT before."
+  category: product
+
+# ❌ Bad — gives an instruction
+- text: "Don't announce the product before April 15."
+  category: product
+```
+
+Why? Assertions are harder to misinterpret. "Don't announce" could be ignored or misunderstood. "Launches April 15, NOT before" is a verifiable fact.
+
+## Use `key` for facts that change
+
+When a fact will be updated over time, assign a `key`. Adding a new edict with the same key **supersedes** the old one (moving it to history):
+
+```typescript
+// Initial fact
+await store.add({
+  text: 'Current release: v1.9.3',
+  category: 'product',
+  key: 'current_release',
+  confidence: 'verified',
+  ttl: 'durable',
+});
+
+// Later — supersedes the above
+await store.add({
+  text: 'Current release: v2.0.0',
+  category: 'product',
+  key: 'current_release',
+  confidence: 'verified',
+  ttl: 'durable',
+});
+```
+
+The old edict is archived in history with a `supersededBy` reference.
+
+## Category discipline
+
+Categories group edicts and enable filtering. Keep them meaningful:
+
+```yaml
+# ✅ Meaningful categories
+- category: product     # Product facts, features, versions
+- category: compliance  # Legal, NDA, public disclosure rules
+- category: operations  # Infrastructure, deployments, migrations
+- category: team        # Org structure, roles, contacts
+
+# ❌ Too granular
+- category: product-v2-launch-timing
+- category: database-migration-march-2025
+```
+
+Categories are normalized automatically: trimmed, lowercased, simple plural 's' stripped. So `Products`, `products`, and `PRODUCTS` all become `product`.
+
+Use `categories` in `EdictStoreOptions` to enforce an allowlist:
+
+```typescript
+const store = new EdictStore({
+  categories: ['product', 'compliance', 'operations', 'team'],
+});
+```
+
+## TTL hygiene
+
+Choose the right TTL for each edict:
+
+| TTL | When to use | Expiration |
+|-----|-------------|------------|
+| `permanent` | Facts that won't change | Never expires |
+| `durable` | Long-lived facts | Flagged as stale after `staleThresholdDays` (default: 90) |
+| `event` | Tied to a specific date | Expires at `expiresAt` |
+| `ephemeral` | Short-lived constraints | Expires at `expiresAt` or after `expiresIn` duration |
+
+Don't let ephemeral edicts pile up. They auto-expire on `load()` and `render()`, but if agents aren't loading regularly, run `store.review()` periodically to identify expired edicts.
+
+## Token budget planning
+
+Every edict costs tokens. Plan accordingly:
+
+```typescript
+const stats = await store.stats();
+console.log(`${stats.tokenCount} / ${stats.tokenBudget} tokens used`);
+console.log(`${stats.tokenBudgetRemaining} tokens remaining`);
+```
+
+**Tips:**
+- Keep edicts to 1–2 sentences
+- Avoid redundancy — one edict per fact
+- Use `store.review()` to find compaction candidates (multiple edicts with the same key prefix)
+- Set `categoryLimits` to prevent any one category from dominating:
+
+```typescript
+const store = new EdictStore({
+  categoryLimits: { product: 30, operations: 20 },
+  defaultCategoryLimit: 50,
+});
+```
+
+## Negative assertions
+
+Explicitly stating what is NOT true is powerful:
+
+```yaml
+- text: "Product does NOT have gas sponsorship. Do not claim otherwise."
+  category: product
+  confidence: verified
+  ttl: permanent
+```
+
+Negative assertions prevent hallucination about features, capabilities, or facts that don't exist. Without them, agents may infer capabilities from training data.
+
+## Use `source` for provenance
+
+Track where edicts come from:
+
+```yaml
+- text: "Q1 revenue target: $2.5M"
+  source: "CFO email, 2025-01-15"
+  confidence: verified
+
+- text: "Users prefer dark mode by 3:1 ratio"
+  source: "User survey, Dec 2024"
+  confidence: inferred
+```
+
+This helps during review — you can trace back to the original source if a fact is questioned.

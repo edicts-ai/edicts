@@ -1,0 +1,35 @@
+---
+---
+
+<section class="py-20 border-t border-border-subtle">
+  <div class="max-w-4xl mx-auto px-6">
+    <h2 class="text-2xl sm:text-3xl font-bold text-center mb-12">Get started in 30 seconds</h2>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Install -->
+      <div class="bg-code-bg border border-border-subtle rounded-lg overflow-hidden">
+        <div class="px-4 py-2 border-b border-border-subtle">
+          <span class="text-xs text-text-secondary font-mono">bash</span>
+        </div>
+        <pre class="p-4 text-sm leading-relaxed overflow-x-auto"><code class="text-text-primary"><span class="text-accent">npm</span> install edicts</code></pre>
+      </div>
+
+      <!-- Usage -->
+      <div class="bg-code-bg border border-border-subtle rounded-lg overflow-hidden">
+        <div class="px-4 py-2 border-b border-border-subtle">
+          <span class="text-xs text-text-secondary font-mono">typescript</span>
+        </div>
+        <pre class="p-4 text-sm leading-relaxed overflow-x-auto"><code class="text-text-primary"><span class="text-accent">import</span> {"{"} EdictStore {"}"} <span class="text-accent">from</span> <span class="text-success">'edicts'</span>;
+
+<span class="text-accent">const</span> store = <span class="text-accent">new</span> EdictStore({"{"} path: <span class="text-success">'./edicts.yaml'</span> {"}"});
+<span class="text-accent">await</span> store.load();
+
+<span class="text-accent">const</span> rendered = store.render();
+console.log(rendered);
+<span class="text-text-secondary">// ## Edicts</span>
+<span class="text-text-secondary">// - **[product]** Product v2.0 launches April 15, NOT before.</span>
+<span class="text-text-secondary">// - **[compliance]** Never mention Project X publicly.</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>

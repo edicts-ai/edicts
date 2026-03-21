@@ -1,0 +1,134 @@
+---
+title: "YAML Schema"
+---
+
+## File structure
+
+The edicts file has four top-level keys:
+
+```yaml
+version: 1
+config:
+  maxEdicts: 200
+  tokenBudget: 4000
+  categories: []
+  staleThresholdDays: 90
+  categoryLimits: {}
+  defaultCategoryLimit: null
+  defaultEphemeralTtlSeconds: 86400
+edicts: []
+history: []
+```
+
+## Config section
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `maxEdicts` | `number` | Maximum number of active edicts |
+| `tokenBudget` | `number` | Maximum total token budget |
+| `categories` | `string[]` | Allowed categories (empty = any) |
+| `staleThresholdDays` | `number` | Days before durable edicts are stale |
+| `categoryLimits` | `Record<string, number>` | Per-category soft limits |
+| `defaultCategoryLimit` | `number` | Default limit for unlisted categories |
+| `defaultEphemeralTtlSeconds` | `number` | Default TTL for ephemeral edicts |
+
+Config values in the file are merged with constructor options. Constructor options take precedence.
+
+## Edict fields
+
+Each edict in the `edicts` array:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Auto-generated | Unique identifier. Sequential (`e_001`, `e_002`) or derived from `key` |
+| `text` | `string` | ✅ | The edict content — the actual fact or assertion |
+| `category` | `string` | ✅ | Category for grouping. Normalized: lowercased, trimmed, plural 's' stripped |
+| `tags` | `string[]` | Default: `[]` | Free-form tags for fine-grained filtering. Same normalization as category |
+| `confidence` | `'verified' \| 'inferred' \| 'user'` | Default: `'user'` | How confident we are in this fact |
+| `source` | `string` | Default: `'manual'` | Provenance — who or what established this edict |
+| `key` | `string` | Optional | Dedup/supersession key. Adding an edict with an existing key supersedes the old one |
+| `ttl` | `'ephemeral' \| 'event' \| 'durable' \| 'permanent'` | Default: `'durable'` | Time-to-live classification |
+| `expiresAt` | `string` (ISO 8601) | Optional | Expiration date for ephemeral/event edicts |
+| `created` | `string` (ISO 8601) | Auto-set | When the edict was created |
+| `updated` | `string` (ISO 8601) | Auto-set | When the edict was last modified |
+| `lastAccessed` | `string` (ISO 8601) | Auto-set | Last time this edict was accessed via `get()` or `render()` |
+
+## Complete example
+
+```yaml
+version: 1
+config:
+  maxEdicts: 200
+  tokenBudget: 4000
+  categories:
+    - product
+    - compliance
+    - operations
+  staleThresholdDays: 90
+
+edicts:
+  - id: e_001
+    text: "Product v2.0 launches April 15, NOT before."
+    category: product
+    tags:
+      - launch
+      - v2
+    confidence: verified
+    source: "Product team standup, 2025-03-15"
+    ttl: event
+    expiresAt: "2025-04-16T00:00:00.000Z"
+    created: "2025-03-15T10:00:00.000Z"
+    updated: "2025-03-15T10:00:00.000Z"
+
+  - id: no_gas_sponsorship
+    text: "Product does NOT have gas sponsorship. Do not claim otherwise."
+    category: product
+    tags:
+      - feature
+      - negative
+    confidence: verified
+    source: manual
+    key: no_gas_sponsorship
+    ttl: permanent
+    created: "2025-03-10T00:00:00.000Z"
+    updated: "2025-03-10T00:00:00.000Z"
+
+  - id: e_003
+    text: "Database migration in progress — no writes to users table."
+    category: operations
+    tags: []
+    confidence: verified
+    source: "ops-agent"
+    ttl: ephemeral
+    expiresAt: "2025-03-22T10:00:00.000Z"
+    created: "2025-03-20T10:00:00.000Z"
+    updated: "2025-03-20T10:00:00.000Z"
+
+history:
+  - id: "current_release__1710900000000_1"
+    text: "Current release: v1.9.3"
+    supersededBy: "current_release"
+    archivedAt: "2025-03-20T12:00:00.000Z"
+```
+
+## History entries
+
+When an edict is superseded (via `key` match) or explicitly removed, it's moved to `history`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | Original ID with timestamp suffix: `{id}__{timestamp}_{version}` |
+| `text` | `string` | The original edict text |
+| `supersededBy` | `string` | ID of the replacing edict, or `'expired'` |
+| `archivedAt` | `string` (ISO 8601) | When this entry was archived |
+
+History provides an audit trail. Old edicts aren't deleted — they're archived.
+
+## TTL types
+
+| TTL | Behavior |
+|-----|----------|
+| `permanent` | Never expires. For facts that won't change. |
+| `durable` | No auto-expiration, but flagged as "stale" after `staleThresholdDays` in `review()`. |
+| `event` | Expires at `expiresAt`. Tied to a specific date/event. |
+| `ephemeral` | Expires at `expiresAt` (computed from `expiresIn` if not set). Short-lived constraints. |

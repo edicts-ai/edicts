@@ -1,0 +1,148 @@
+---
+title: "OpenClaw Integration"
+---
+
+Edicts includes a first-party [OpenClaw](https://openclaw.ai) plugin that automatically injects edicts into every prompt and exposes CRUD tools for agents.
+
+## Installation
+
+The plugin is bundled with the `edicts` package:
+
+```bash
+npm install edicts
+```
+
+## Configuration
+
+Add the plugin to your `openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-plugin-edicts": {
+        "enabled": true,
+        "config": {
+          "path": "./edicts.yaml",
+          "renderFormat": "markdown",
+          "includeSystemContext": true,
+          "systemContextHeading": "Edicts",
+          "contextMaxEdicts": 20,
+          "tools": {
+            "optional": true
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## How it works
+
+The plugin hooks into two OpenClaw extension points:
+
+### 1. Prompt injection (`before_prompt_build`)
+
+Before every LLM call, the plugin renders your edicts and injects them into the system prompt. Your agent sees verified ground truth without any manual wiring.
+
+The rendered output appears under a heading (default: `## Edicts`) in the system context. If no edicts exist, it shows the `emptySystemContext` message (or nothing).
+
+### 2. Agent tools
+
+The plugin registers 7 tools that let agents manage edicts at runtime:
+
+| Tool | Description |
+|------|-------------|
+| `edicts_list` | List all active edicts with optional category/tag/confidence filters |
+| `edicts_get` | Get a single edict by ID |
+| `edicts_add` | Add a new edict (with text, category, confidence, TTL, etc.) |
+| `edicts_update` | Update an existing edict by ID |
+| `edicts_remove` | Remove an edict by ID |
+| `edicts_search` | Search edicts by text query |
+| `edicts_stats` | Get store statistics (counts, token usage, breakdowns) |
+
+## Plugin configuration reference
+
+All properties are optional. The plugin uses sensible defaults.
+
+### Store options
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `path` | `string` | `'./edicts.yaml'` | Path to the edicts file |
+| `format` | `'yaml' \| 'json'` | Auto-detected | Storage format |
+| `maxEdicts` | `number` | `200` | Maximum active edicts |
+| `tokenBudget` | `number` | `4000` | Maximum token budget |
+| `categories` | `string[]` | `[]` | Allowed categories |
+| `staleThresholdDays` | `number` | `90` | Stale threshold for durable edicts |
+| `categoryLimits` | `Record<string, number>` | `undefined` | Per-category limits |
+| `defaultCategoryLimit` | `number` | `undefined` | Default category limit |
+| `defaultEphemeralTtlSeconds` | `number` | `86400` | Default ephemeral TTL |
+| `autoSave` | `boolean` | `true` | Auto-save after mutations |
+
+### Context options
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `renderFormat` | `'plain' \| 'markdown' \| 'json'` | `'markdown'` | Format for prompt injection |
+| `includeSystemContext` | `boolean` | `true` | Whether to inject edicts into prompts |
+| `systemContextHeading` | `string` | `'Edicts'` | Heading used in prompt injection |
+| `emptySystemContext` | `string` | `undefined` | Message shown when no edicts exist |
+| `contextMaxEdicts` | `number` | `undefined` | Max edicts to inject (all if unset) |
+| `contextCategories` | `string[]` | `undefined` | Only inject edicts in these categories |
+| `contextTags` | `string[]` | `undefined` | Only inject edicts with these tags |
+| `contextConfidence` | `('verified' \| 'inferred' \| 'user')[]` | `undefined` | Only inject edicts at these confidence levels |
+
+### Tool options
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `tools.enabled` | `boolean` | `true` | Whether to register agent tools |
+| `tools.names` | `string[]` | All 7 tools | Subset of tools to register |
+| `tools.optional` | `boolean` | `true` | Whether tools are optional (OpenClaw can continue if registration fails) |
+
+## Example: filtered context
+
+Only inject verified product edicts into the prompt:
+
+```json
+{
+  "config": {
+    "path": "./edicts.yaml",
+    "includeSystemContext": true,
+    "contextCategories": ["product"],
+    "contextConfidence": ["verified"],
+    "contextMaxEdicts": 10
+  }
+}
+```
+
+## Example: read-only agent
+
+Give an agent visibility into edicts without write access:
+
+```json
+{
+  "config": {
+    "path": "./edicts.yaml",
+    "tools": {
+      "names": ["edicts_list", "edicts_get", "edicts_search", "edicts_stats"]
+    }
+  }
+}
+```
+
+## Programmatic exports
+
+For advanced integration:
+
+```typescript
+import {
+  openclawPluginEdicts,    // Plugin factory function
+  createEdictsTools,       // Create tool definitions
+  buildBeforePromptBuildResult, // Build prompt injection result
+  normalizePluginConfig,   // Normalize config with defaults
+  edictsPluginConfigSchema // Zod schema for config validation
+} from 'edicts';
+```

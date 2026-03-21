@@ -1,0 +1,80 @@
+---
+title: "Quick Start"
+---
+
+## Add edicts programmatically
+
+```typescript
+import { EdictStore } from 'edicts';
+
+const store = new EdictStore({ path: './edicts.yaml' });
+await store.load();
+
+// Add a verified product fact
+await store.add({
+  text: 'Product v2.0 launches April 15, NOT before.',
+  category: 'product',
+  confidence: 'verified',
+  ttl: 'event',
+  expiresAt: '2025-04-16',
+});
+
+// Add a permanent compliance constraint
+await store.add({
+  text: 'Never mention Project X publicly.',
+  category: 'compliance',
+  confidence: 'verified',
+  ttl: 'permanent',
+});
+
+// Add an ephemeral operational note
+await store.add({
+  text: 'Database migration in progress — no writes to users table.',
+  category: 'operations',
+  confidence: 'verified',
+  ttl: 'ephemeral',
+  expiresIn: '48h',
+});
+```
+
+## Render for prompt injection
+
+The `render()` method produces a formatted string ready to inject into any LLM prompt:
+
+```typescript
+const rendered = await store.render();
+console.log(rendered);
+```
+
+Output (markdown format, default):
+
+```markdown
+## Edicts
+
+- **[product]** Product v2.0 launches April 15, NOT before. *(verified, event — expires 2025-04-16)*
+- **[compliance]** Never mention Project X publicly. *(verified, permanent)*
+- **[operations]** Database migration in progress — no writes to users table. *(verified, ephemeral — expires in 48h)*
+```
+
+## Inject into your agent
+
+Edicts is framework-agnostic. Concatenate the rendered output with your system prompt:
+
+```typescript
+const systemPrompt = `You are a helpful assistant.
+
+${await store.render()}
+
+Use the edicts above as ground truth. Never contradict them.`;
+
+// Pass systemPrompt to your LLM of choice
+```
+
+That's it — three edicts, ~40 tokens total, injected into every session.
+
+## What's next?
+
+- [Memory Hierarchy](/docs/guides/memory-hierarchy/) — understand where Edicts fits in your agent's context
+- [Best Practices](/docs/guides/best-practices/) — write effective edicts
+- [API Reference](/docs/reference/api/) — full method documentation
+- [OpenClaw Integration](/docs/integrations/openclaw/) — automatic prompt injection via plugin

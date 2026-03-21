@@ -1,0 +1,155 @@
+---
+import Marketing from '../layouts/Marketing.astro';
+
+const cases = [
+  {
+    category: 'product',
+    ttl: 'event',
+    icon: '🚀',
+    title: 'Product Launch Coordination',
+    problem: 'Your marketing agent monitors social channels and draft posts. It sees internal chatter about v2.0 and, trying to be helpful, tweets "Just shipped v2.0! 🎉" — three days before the actual launch. The announcement goes out to 50K followers. Now your comms team is scrambling.',
+    edict: {
+      text: 'Product v2.0 launches April 15, NOT before.',
+      category: 'product',
+      confidence: 'verified',
+      ttl: 'event',
+      expiresAt: '2025-04-16',
+    },
+    tokens: 12,
+    result: 'Agent sees the edict before every action. The premature tweet never happens. On April 16, the edict auto-expires and the constraint lifts.',
+  },
+  {
+    category: 'product',
+    ttl: 'permanent',
+    icon: '🛡️',
+    title: 'Feature Existence Guardrails',
+    problem: 'A user asks your support agent "Does your product support gas sponsorship?" The agent, eager to help and pattern-matching from training data, replies "Yes, we support gas sponsorship for all transactions!" Your product has never had gas sponsorship. Now your support team has a promise to walk back.',
+    edict: {
+      text: 'Product does NOT have gas sponsorship. Do not claim otherwise.',
+      category: 'product',
+      confidence: 'verified',
+      ttl: 'permanent',
+    },
+    tokens: 9,
+    result: 'Agent checks edicts before responding. The false claim never gets made. Negative assertions are first-class citizens.',
+  },
+  {
+    category: 'operations',
+    ttl: 'durable',
+    icon: '🤝',
+    title: 'Multi-Agent Consistency',
+    problem: 'You have five cron agents: one monitors support tickets, one handles social media, one writes reports, one schedules meetings, and one manages releases. Each wakes up fresh with no shared context. Agent 1 says "v2.0 is live", Agent 3 says "v2.0 is in QA", Agent 5 says "v2.0 is planned for next quarter." Same product, five different realities.',
+    edict: {
+      text: 'v2.0 is in final QA. Expected release: April 15.',
+      category: 'operations',
+      confidence: 'verified',
+      ttl: 'durable',
+    },
+    tokens: 14,
+    result: 'All five agents read the same edicts.yaml on every session. One source of truth, zero contradictions. Update once, propagate everywhere.',
+  },
+  {
+    category: 'compliance',
+    ttl: 'permanent',
+    icon: '🔒',
+    title: 'Compliance Constraints',
+    problem: 'Your company is in acquisition talks. A PR agent, asked about company strategy, mentions "exciting partnership discussions" in a blog draft. Or an agent responding to a community question casually references a project codename that\'s under NDA. These are career-ending mistakes.',
+    edict: {
+      text: 'Never mention Project X publicly. Company acquisition discussions are confidential.',
+      category: 'compliance',
+      confidence: 'verified',
+      ttl: 'permanent',
+    },
+    tokens: 15,
+    result: 'Compliance edicts are permanent and verified. Every agent, every session, every channel — the constraint is present before any output is generated.',
+  },
+  {
+    category: 'operations',
+    ttl: 'ephemeral',
+    icon: '⏱️',
+    title: 'Time-Sensitive Operations',
+    problem: 'You\'re migrating your database. For the next 48 hours, agents should not trigger any write operations to the user table. After migration completes, this constraint should disappear. But someone always forgets to remove the manual override, and three weeks later agents are still refusing writes.',
+    edict: {
+      text: 'Database migration in progress. Do NOT write to users table until migration complete.',
+      category: 'operations',
+      confidence: 'verified',
+      ttl: 'ephemeral',
+      expiresIn: '48h',
+    },
+    tokens: 18,
+    result: 'Ephemeral edict with a 48-hour TTL. The constraint self-destructs when the migration window closes. No manual cleanup, no forgotten overrides.',
+  },
+];
+
+const ttlColors: Record<string, string> = {
+  event: 'text-accent',
+  permanent: 'text-text-primary',
+  durable: 'text-success',
+  ephemeral: 'text-danger',
+};
+---
+
+<Marketing title="Use Cases — Edicts" description="Real problems solved by verified ground truth for AI agents.">
+  <div class="py-20">
+    <div class="max-w-3xl mx-auto px-6 text-center mb-16">
+      <h1 class="text-3xl sm:text-4xl font-bold">Use Cases</h1>
+      <p class="text-text-secondary mt-4 text-lg">Real problems. Real fixes. Real token counts.</p>
+    </div>
+
+    {cases.map((c, i) => (
+      <section class={`py-16 ${i % 2 === 1 ? 'bg-bg-surface' : ''}`}>
+        <div class="max-w-3xl mx-auto px-6">
+          {/* Pills */}
+          <div class="flex items-center gap-3 mb-4">
+            <span class="text-xs font-mono px-2 py-1 rounded bg-accent-muted text-accent">{c.category}</span>
+            <span class={`text-xs font-mono ${ttlColors[c.edict.ttl] || 'text-text-secondary'}`}>{c.edict.ttl}</span>
+          </div>
+
+          <h2 class="text-xl sm:text-2xl font-bold flex items-center gap-3">
+            <span>{c.icon}</span> {c.title}
+          </h2>
+
+          {/* The problem */}
+          <div class="mt-6">
+            <h3 class="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-2">The problem</h3>
+            <p class="text-text-secondary leading-relaxed">{c.problem}</p>
+          </div>
+
+          {/* The edict */}
+          <div class="mt-6">
+            <h3 class="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-2">The edict</h3>
+            <div class="bg-code-bg border border-border-subtle rounded-lg p-4 font-mono text-sm">
+              <div><span class="text-accent">text</span>: <span class="text-success">"{c.edict.text}"</span></div>
+              <div><span class="text-accent">category</span>: {c.edict.category}</div>
+              <div><span class="text-accent">confidence</span>: {c.edict.confidence}</div>
+              <div><span class="text-accent">ttl</span>: {c.edict.ttl}</div>
+              {c.edict.expiresAt && <div><span class="text-accent">expiresAt</span>: <span class="text-success">"{c.edict.expiresAt}"</span></div>}
+              {c.edict.expiresIn && <div><span class="text-accent">expiresIn</span>: <span class="text-success">"{c.edict.expiresIn}"</span></div>}
+              <div class="text-text-secondary mt-2">cost: {c.tokens} tokens</div>
+            </div>
+          </div>
+
+          {/* The result */}
+          <div class="mt-6">
+            <h3 class="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-2">The result</h3>
+            <p class="text-success leading-relaxed">{c.result}</p>
+          </div>
+        </div>
+      </section>
+    ))}
+
+    {/* Bottom CTA */}
+    <section class="py-20 text-center">
+      <div class="max-w-xl mx-auto px-6">
+        <h2 class="text-2xl sm:text-3xl font-bold mb-6">Ready to stop your agents from hallucinating?</h2>
+        <a
+          href="/docs/getting-started/installation/"
+          class="inline-flex items-center gap-2 px-6 py-3 bg-accent text-bg-primary font-semibold rounded-lg hover:bg-accent-hover transition-colors text-sm"
+        >
+          Get Started
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </section>
+  </div>
+</Marketing>

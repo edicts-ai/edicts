@@ -1,0 +1,74 @@
+---
+title: "Memory Hierarchy"
+---
+
+## The three layers
+
+AI agents operate across a spectrum of context availability:
+
+| Layer | Token cost | Reliability | Examples |
+|-------|-----------|-------------|----------|
+| **Full context** | ~4K–20K tokens | High (but expensive) | MEMORY.md, SOUL.md, LCM, conversation history |
+| **Edicts** | ~200–4K tokens | High (verified, budgeted) | Ground truth facts, constraints, assertions |
+| **No context** | 0 tokens | Low (hallucination territory) | Raw LLM with no injected knowledge |
+
+Edicts occupies the middle layer — cheap enough for every session (including cron jobs and lightweight agents), reliable enough for critical facts.
+
+## When to use Edicts
+
+Edicts are for **verified, actionable facts** that agents need in every session. They're assertions, not instructions.
+
+### Edicts vs. MEMORY.md
+
+| | Edicts | MEMORY.md |
+|---|---|---|
+| **Size** | 200–4K tokens | 4K–20K tokens |
+| **Content** | Verified facts, constraints | Full context, preferences, history |
+| **Update frequency** | As facts change | Continuously curated |
+| **Suitable for cron agents** | ✅ Yes | ❌ Too expensive |
+| **Structure** | Typed, categorized, TTL | Freeform markdown |
+| **Expiration** | Built-in (ephemeral, event, durable) | Manual maintenance |
+
+### Edicts vs. daily notes
+
+Daily notes (`memory/YYYY-MM-DD.md`) are raw session logs. Edicts are curated truths extracted from those logs. Think of daily notes as your journal and edicts as your cheat sheet.
+
+### Edicts vs. LCM (Lossless Context Management)
+
+LCM manages conversation history compression. Edicts manage **declared facts**. They're complementary — LCM handles what was said, Edicts handle what is true.
+
+## Should this be an edict?
+
+Ask yourself:
+
+1. **Is it a fact, not an instruction?** Edicts declare truth ("v2.0 launches April 15"), not behavior ("be helpful").
+2. **Do multiple agents need it?** If only one agent in one session needs this, it's probably not an edict.
+3. **Would getting it wrong cause harm?** If an agent hallucinating this fact would cause real problems, it's an edict.
+4. **Does it fit in 1–2 sentences?** Edicts should be concise assertions, not paragraphs.
+5. **Does it have a natural expiration?** If yes, use `ttl: event` or `ttl: ephemeral` with an expiry.
+
+### Good edicts
+
+- ✅ "Product v2.0 launches April 15, NOT before."
+- ✅ "Product does NOT have gas sponsorship."
+- ✅ "Database migration in progress — no writes to users table."
+- ✅ "Company headquarters moved to Los Angeles in August 2024."
+
+### Not edicts
+
+- ❌ "Be helpful and friendly" → That's a system prompt instruction
+- ❌ "Michael prefers direct communication" → That's MEMORY.md context
+- ❌ "Yesterday we discussed the API redesign" → That's a daily note
+- ❌ A three-paragraph explanation of product architecture → Too long, use docs
+
+## Token budget planning
+
+The default token budget is **4,000 tokens**. At ~12 tokens per edict, that's ~330 edicts before hitting the budget.
+
+In practice, most agent setups need 10–50 edicts. That's 120–600 tokens — leaving plenty of room.
+
+**Budget tips:**
+- Start with the default 4K budget
+- Use `store.stats()` to monitor actual usage
+- Use `store.review()` to find stale edicts eating budget
+- Keep edicts concise — every word costs tokens

@@ -3,3 +3,6 @@ dist/
 coverage/
 *.log
 *.tmp
+website/node_modules/
+website/dist/
+website/.astro/

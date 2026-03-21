@@ -1,0 +1,40 @@
+---
+import UseCaseCard from './UseCaseCard.astro';
+---
+
+<section class="py-20 border-t border-border-subtle">
+  <div class="max-w-5xl mx-auto px-6">
+    <h2 class="text-2xl sm:text-3xl font-bold text-center mb-12">Real problems, real fixes</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <UseCaseCard
+        icon="🚀"
+        title="Product Launch Coordination"
+        problem="Agent tweets 'just shipped!' three days early"
+        solution="Edict: 'v2.0 launches April 15, NOT before.' — 12 tokens"
+        tokens={12}
+      />
+      <UseCaseCard
+        icon="🛡️"
+        title="Feature Guardrails"
+        problem="Support agent claims a feature that doesn't exist"
+        solution="Edict: 'Product does NOT have gas sponsorship.' — 9 tokens"
+        tokens={9}
+      />
+      <UseCaseCard
+        icon="🤝"
+        title="Multi-Agent Consistency"
+        problem="Five cron agents give contradictory answers"
+        solution="Shared edicts file: same ground truth, every session — 47 tokens"
+        tokens={47}
+      />
+    </div>
+
+    <p class="text-center mt-8">
+      <a href="/use-cases" class="text-accent hover:text-accent-hover transition-colors text-sm inline-flex items-center gap-1">
+        See all use cases
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </p>
+  </div>
+</section>

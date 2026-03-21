@@ -1,0 +1,29 @@
+---
+interface Props {
+  icon: string;
+  title: string;
+  problem: string;
+  solution: string;
+  tokens: number;
+}
+
+const { icon, title, problem, solution, tokens } = Astro.props;
+---
+
+<div class="bg-bg-surface border border-border-subtle rounded-lg p-6 hover:bg-bg-surface-hover transition-colors">
+  <div class="flex items-center gap-2 mb-4">
+    <span class="text-2xl">{icon}</span>
+    <h3 class="text-base font-semibold text-text-primary">{title}</h3>
+  </div>
+  <div class="space-y-2 text-sm">
+    <p class="text-danger flex items-start gap-2">
+      <span class="shrink-0">✗</span>
+      <span>{problem}</span>
+    </p>
+    <p class="text-success flex items-start gap-2">
+      <span class="shrink-0">✓</span>
+      <span>{solution}</span>
+    </p>
+  </div>
+  <p class="text-text-secondary text-xs mt-3">{tokens} tokens</p>
+</div>

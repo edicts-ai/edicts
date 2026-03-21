@@ -1,0 +1,62 @@
+---
+---
+
+<nav id="main-nav" class="fixed top-0 left-0 right-0 z-50 transition-colors duration-300">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <!-- Wordmark -->
+    <a href="/" class="flex items-center gap-1.5 text-text-primary hover:text-accent transition-colors font-bold text-lg tracking-tight">
+      <span class="text-accent">◆</span> edicts
+    </a>
+
+    <!-- Desktop links -->
+    <div class="hidden md:flex items-center gap-8">
+      <a href="/use-cases" class="text-text-secondary hover:text-text-primary transition-colors text-sm">Use Cases</a>
+      <a href="/docs/getting-started/installation/" class="text-text-secondary hover:text-text-primary transition-colors text-sm">Docs</a>
+      <a href="/pricing" class="text-text-secondary hover:text-text-primary transition-colors text-sm">Pricing</a>
+      <a href="https://github.com/mssteuer/edicts" target="_blank" rel="noopener" class="text-text-secondary hover:text-text-primary transition-colors text-sm flex items-center gap-1">
+        GitHub
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7v10"/></svg>
+      </a>
+    </div>
+
+    <!-- Mobile hamburger -->
+    <button id="nav-toggle" class="md:hidden text-text-secondary hover:text-text-primary p-2" aria-label="Toggle menu">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path id="hamburger-icon" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Mobile menu -->
+  <div id="mobile-menu" class="hidden md:hidden bg-bg-primary border-t border-border-subtle">
+    <div class="px-6 py-4 flex flex-col gap-4">
+      <a href="/use-cases" class="text-text-secondary hover:text-text-primary transition-colors text-sm">Use Cases</a>
+      <a href="/docs/getting-started/installation/" class="text-text-secondary hover:text-text-primary transition-colors text-sm">Docs</a>
+      <a href="/pricing" class="text-text-secondary hover:text-text-primary transition-colors text-sm">Pricing</a>
+      <a href="https://github.com/mssteuer/edicts" target="_blank" rel="noopener" class="text-text-secondary hover:text-text-primary transition-colors text-sm">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Spacer for fixed nav -->
+<div class="h-16"></div>
+
+<script>
+  const nav = document.getElementById('main-nav');
+  const toggle = document.getElementById('nav-toggle');
+  const menu = document.getElementById('mobile-menu');
+
+  // Scroll: transparent → solid
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > 20) {
+      nav?.classList.add('bg-bg-primary/95', 'backdrop-blur-sm', 'border-b', 'border-border-subtle');
+    } else {
+      nav?.classList.remove('bg-bg-primary/95', 'backdrop-blur-sm', 'border-b', 'border-border-subtle');
+    }
+  });
+
+  // Mobile toggle
+  toggle?.addEventListener('click', () => {
+    menu?.classList.toggle('hidden');
+  });
+</script>
