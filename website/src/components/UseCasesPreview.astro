@@ -31,7 +31,7 @@ import UseCaseCard from './UseCaseCard.astro';
     </div>
 
     <p class="text-center mt-8">
-      <a href="/use-cases" class="text-accent hover:text-accent-hover transition-colors text-sm inline-flex items-center gap-1">
+      <a href={`${import.meta.env.BASE_URL}use-cases`} class="text-accent hover:text-accent-hover transition-colors text-sm inline-flex items-center gap-1">
         See all use cases
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
       </a>
