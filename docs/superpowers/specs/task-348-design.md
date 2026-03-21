@@ -22,7 +22,7 @@ All repos transfer to `edicts-ai` org when created.
 
 ### CI Workflow (`.github/workflows/ci.yml`)
 
-**Triggers:** push to `main`, pull requests targeting `main`
+**Triggers:** push to `master`, pull requests targeting `master`
 
 **Jobs:**
 1. **ci** — single job, Node 20, ubuntu-latest
@@ -132,9 +132,9 @@ Pages source must be set to "GitHub Actions" (not branch-based). This is configu
 
 ## Acceptance Criteria
 
-1. `edicts` repo: CI workflow runs lint, typecheck, tests, build on push/PR to main
+1. `edicts` repo: CI workflow runs lint, typecheck, tests, build on push/PR to default branch
 2. `edicts` repo: Publish workflow publishes to npm on `v*` tag push
-3. `openclaw-plugin-edicts` repo: CI workflow runs lint, typecheck, tests, build on push/PR to main
+3. `openclaw-plugin-edicts` repo: CI workflow runs lint, typecheck, tests, build on push/PR to default branch
 4. `openclaw-plugin-edicts` repo: Publish workflow publishes to npm on `v*` tag push
 5. `edicts.ai` repo created at `mssteuer/edicts.ai` with Astro scaffold
 6. `edicts.ai` repo: GitHub Pages deployment workflow on push to main

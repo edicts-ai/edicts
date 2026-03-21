@@ -50,9 +50,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   ci:
@@ -156,7 +156,7 @@ git commit -m "ci: add CI and publish workflows"
 
 ```bash
 cd /home/jeanclaude/workspace/edicts
-git push origin main
+git push origin master
 ```
 
 - [ ] **Step 3: Verify push succeeded**
@@ -191,9 +191,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   ci:
@@ -302,7 +302,7 @@ git commit -m "ci: add CI and publish workflows"
 
 ```bash
 cd /home/jeanclaude/workspace/openclaw-plugin-edicts
-git push origin main
+git push origin master
 ```
 
 - [ ] **Step 3: Verify push succeeded**
