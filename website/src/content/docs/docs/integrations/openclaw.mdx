@@ -133,16 +133,16 @@ Give an agent visibility into edicts without write access:
 }
 ```
 
-## Programmatic exports
+## Programmatic usage
 
-For advanced integration:
+The plugin is built on top of the core `edicts` library. You can use the same store API directly:
 
 ```typescript
-import {
-  openclawPluginEdicts,    // Plugin factory function
-  createEdictsTools,       // Create tool definitions
-  buildBeforePromptBuildResult, // Build prompt injection result
-  normalizePluginConfig,   // Normalize config with defaults
-  edictsPluginConfigSchema // Zod schema for config validation
-} from 'edicts';
+import { EdictStore } from 'edicts';
+
+const store = await EdictStore.open('./edicts.yaml');
+const edicts = store.render('markdown');
+console.log(edicts);
 ```
+
+See the [API Reference](/docs/docs/reference/api/) for the full store API.
