@@ -31,16 +31,3 @@ export { normalizeCategory, normalizeTags } from './normalize.js';
 export { defaultTokenizer } from './tokenizer.js';
 export { renderPlain, renderMarkdown, renderJson } from './renderer.js';
 export { parseDuration } from './duration.js';
-
-export {
-  openclawPluginEdicts,
-  edictsPluginConfigSchema,
-  createEdictsTools,
-  buildBeforePromptBuildResult,
-  normalizePluginConfig,
-} from './openclaw/index.js';
-
-export type {
-  EdictsPluginConfig,
-  EdictsToolName,
-} from './openclaw/index.js';
