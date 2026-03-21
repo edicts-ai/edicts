@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { EdictStore } from '../src/store.js';
-import { EdictBudgetExceededError, EdictValidationError } from '../src/errors.js';
+import { EdictBudgetExceededError } from '../src/errors.js';
 
 let tempDirs: string[] = [];
 
@@ -57,7 +57,7 @@ describe('additional validation coverage', () => {
     await expect(store.render('plain')).resolves.toContain('Rendered');
   });
 
-  it('render(json) strips internal _tokens and persists lastAccessed when autoSave is enabled', async () => {
+  it('render(json) strips internal _tokens from serialized output', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'edicts-extra-render-save-'));
     tempDirs.push(dir);
     const path = join(dir, 'edicts.yaml');
@@ -70,8 +70,66 @@ describe('additional validation coverage', () => {
     expect(parsed[0]).not.toHaveProperty('_tokens');
 
     const saved = await readFile(path, 'utf-8');
+    expect(saved).not.toContain('_tokens');
+  });
+
+  it('render(json) persists lastAccessed when autoSave is enabled', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'edicts-extra-render-last-accessed-'));
+    tempDirs.push(dir);
+    const path = join(dir, 'edicts.yaml');
+    const store = new EdictStore({ path, autoSave: true });
+    await store.load();
+    await store.add({ text: 'Persist me', category: 'test' });
+
+    await store.render('json');
+
+    const saved = await readFile(path, 'utf-8');
     expect(saved).toContain('lastAccessed:');
     expect(saved).not.toContain('_tokens');
+  });
+
+  it('supports end-to-end add, render, supersede, and history verification via key', async () => {
+    const store = await makeStore('end-to-end');
+    await store.load();
+
+    const added = await store.add({
+      text: 'Initial truth',
+      category: 'product',
+      key: 'shared-truth',
+    });
+
+    expect(added.edict?.id).toBe('shared-truth');
+
+    const plainBefore = await store.render('plain');
+    expect(plainBefore).toContain('Initial truth');
+
+    const jsonBefore = JSON.parse(await store.render('json'));
+    expect(jsonBefore).toHaveLength(1);
+    expect(jsonBefore[0].id).toBe('shared-truth');
+    expect(jsonBefore[0].text).toBe('Initial truth');
+
+    await store.add({
+      text: 'Updated truth',
+      category: 'product',
+      key: 'shared-truth',
+    });
+
+    const current = await store.get('shared-truth');
+    expect(current?.text).toBe('Updated truth');
+
+    const plainAfter = await store.render('plain');
+    expect(plainAfter).toContain('Updated truth');
+    expect(plainAfter).not.toContain('Initial truth');
+
+    const jsonAfter = JSON.parse(await store.render('json'));
+    expect(jsonAfter).toHaveLength(1);
+    expect(jsonAfter[0].id).toBe('shared-truth');
+    expect(jsonAfter[0].text).toBe('Updated truth');
+
+    const history = store.history();
+    expect(history).toHaveLength(1);
+    expect(history[0].id).toMatch(/^shared-truth__/);
+    expect(history[0].text).toBe('Initial truth');
   });
 
   it('ephemeral ttl without explicit expiry gets default expiration', async () => {
@@ -96,6 +154,7 @@ describe('additional validation coverage', () => {
       config: { maxEdicts: 200, tokenBudget: 4000, categories: [] },
       edicts: [
         {
+          // Intentional schema violation: omit `created` so importData records a validation warning.
           id: 'expired-import',
           text: 'Expired',
           category: 'test',
