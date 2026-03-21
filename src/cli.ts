@@ -1,5 +1,10 @@
 #!/usr/bin/env node
+import { readFile, writeFile } from 'node:fs/promises';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { EdictStore } from './store.js';
+import type { Edict, EdictFileSchema, EdictInput, ReviewResult } from './types.js';
+import { renderPlain } from './renderer.js';
+import { EdictNotFoundError } from './errors.js';
 
 function takeFlag(args: string[], name: string): string | undefined {
   const idx = args.indexOf(name);
@@ -11,17 +16,153 @@ function hasFlag(args: string[], name: string): boolean {
   return args.includes(name);
 }
 
+function takePositional(args: string[]): string[] {
+  const positionals: string[] = [];
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg.startsWith('--')) {
+      index += 1;
+      continue;
+    }
+    const prev = args[index - 1];
+    if (prev && prev.startsWith('--')) continue;
+    positionals.push(arg);
+  }
+  return positionals;
+}
+
+function usage(): string {
+  return [
+    'Usage: edicts [--path FILE] [--format yaml|json] <command> [options]',
+    '',
+    'Commands:',
+    '  add --text TEXT --category CAT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--key KEY] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION]',
+    '  list [--json]',
+    '  stats',
+    '  get <id> [--plain|--json]',
+    '  remove <id>',
+    '  update <id> [--text TEXT] [--category CAT] [--tags TAGS] [--confidence CONF] [--ttl TTL] [--key KEY] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION]',
+    '  search <query> [--json]',
+    '  review [--stale-days N] [--include-permanent] [--json]',
+    '  export [--format json|yaml] [--output FILE]',
+    '  import <file> [--merge|--replace]',
+  ].join('\n');
+}
+
+function parseStoreFormat(value: string | undefined): 'yaml' | 'json' | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'yaml' || value === 'json') return value;
+  throw new Error(`Invalid format "${value}". Must be yaml or json.`);
+}
+
+function parseConfidence(value: string | undefined): Edict['confidence'] | undefined {
+  if (!value) return undefined;
+  return value as Edict['confidence'];
+}
+
+function parseTtl(value: string | undefined): Edict['ttl'] | undefined {
+  if (!value) return undefined;
+  return value as Edict['ttl'];
+}
+
+function parseTags(value: string | undefined): string[] | undefined {
+  return value?.split(',').map((v) => v.trim()).filter(Boolean);
+}
+
+function buildInput(args: string[]): EdictInput {
+  return {
+    text: takeFlag(args, '--text') ?? '',
+    category: takeFlag(args, '--category') ?? '',
+    key: takeFlag(args, '--key'),
+    source: takeFlag(args, '--source'),
+    confidence: parseConfidence(takeFlag(args, '--confidence')),
+    ttl: parseTtl(takeFlag(args, '--ttl')),
+    expiresAt: takeFlag(args, '--expiresAt'),
+    expiresIn: takeFlag(args, '--expiresIn'),
+    tags: parseTags(takeFlag(args, '--tags')),
+  };
+}
+
+function buildPatch(args: string[]): Partial<EdictInput> {
+  const patch: Partial<EdictInput> = {};
+  const text = takeFlag(args, '--text');
+  const category = takeFlag(args, '--category');
+  const key = takeFlag(args, '--key');
+  const source = takeFlag(args, '--source');
+  const confidence = parseConfidence(takeFlag(args, '--confidence'));
+  const ttl = parseTtl(takeFlag(args, '--ttl'));
+  const expiresAt = takeFlag(args, '--expiresAt');
+  const expiresIn = takeFlag(args, '--expiresIn');
+  const tags = parseTags(takeFlag(args, '--tags'));
+
+  if (text !== undefined) patch.text = text;
+  if (category !== undefined) patch.category = category;
+  if (key !== undefined) patch.key = key;
+  if (source !== undefined) patch.source = source;
+  if (confidence !== undefined) patch.confidence = confidence;
+  if (ttl !== undefined) patch.ttl = ttl;
+  if (expiresAt !== undefined) patch.expiresAt = expiresAt;
+  if (expiresIn !== undefined) patch.expiresIn = expiresIn;
+  if (tags !== undefined) patch.tags = tags;
+  return patch;
+}
+
+function printEdictPlain(edict: Edict): string {
+  return renderPlain([edict]);
+}
+
+function enrichReview(review: ReviewResult, store: EdictStore, includePermanent: boolean) {
+  const expired = store.history().filter((entry) => entry.supersededBy === 'expired');
+  const stale = includePermanent
+    ? review.stale
+    : review.stale.filter((edict) => edict.ttl !== 'permanent');
+
+  return {
+    ...review,
+    stale,
+    expired,
+    duplicates: review.compactionCandidates,
+  };
+}
+
+function printReviewPlain(review: ReturnType<typeof enrichReview>): string {
+  const lines: string[] = [];
+  lines.push(`stale: ${review.stale.length}`);
+  for (const edict of review.stale) {
+    lines.push(`  - ${edict.id}: ${edict.text}`);
+  }
+  lines.push(`expired: ${review.expired.length}`);
+  for (const entry of review.expired) {
+    lines.push(`  - ${entry.id}: ${entry.text}`);
+  }
+  lines.push(`duplicates: ${review.duplicates.length}`);
+  for (const group of review.duplicates) {
+    lines.push(`  - ${group.category}/${group.keyPrefix}: ${group.edicts.map((edict) => edict.id).join(', ')}`);
+  }
+  lines.push(`compactionCandidates: ${review.compactionCandidates.length}`);
+  return `${lines.join('\n')}\n`;
+}
+
+async function exportSchema(schema: EdictFileSchema, format: 'yaml' | 'json'): Promise<string> {
+  if (format === 'json') {
+    return `${JSON.stringify(schema, null, 2)}\n`;
+  }
+  return stringifyYaml(schema, { indent: 2, lineWidth: 0 });
+}
+
+async function loadImportFile(file: string): Promise<EdictFileSchema> {
+  const content = await readFile(file, 'utf8');
+  if (file.endsWith('.json')) {
+    return JSON.parse(content) as EdictFileSchema;
+  }
+  return parseYaml(content) as EdictFileSchema;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const path = takeFlag(args, '--path') ?? './edicts.yaml';
-  const format = takeFlag(args, '--format') as 'yaml' | 'json' | undefined;
-
-  const positional = args.filter((arg, index) => {
-    if (arg.startsWith('--')) return false;
-    const prev = args[index - 1];
-    if (prev && prev.startsWith('--')) return false;
-    return true;
-  });
+  const format = parseStoreFormat(takeFlag(args, '--format'));
+  const positional = takePositional(args);
   const cmd = positional[0];
 
   const store = new EdictStore({ path, format });
@@ -29,21 +170,12 @@ async function main(): Promise<void> {
 
   switch (cmd) {
     case 'add': {
-      const text = takeFlag(args, '--text');
-      const category = takeFlag(args, '--category');
-      const key = takeFlag(args, '--key');
-      const source = takeFlag(args, '--source');
-      const confidence = takeFlag(args, '--confidence') as 'verified' | 'inferred' | 'user' | undefined;
-      const ttl = takeFlag(args, '--ttl') as 'ephemeral' | 'event' | 'durable' | 'permanent' | undefined;
-      const expiresAt = takeFlag(args, '--expiresAt');
-      const expiresIn = takeFlag(args, '--expiresIn');
-      const tags = takeFlag(args, '--tags')?.split(',').map((v) => v.trim()).filter(Boolean);
-
-      if (!text || !category) {
-        throw new Error('add requires --text and --category');
+      const input = buildInput(args);
+      if (!input.text || !input.category) {
+        throw new Error(`add requires --text and --category\n${usage()}`);
       }
 
-      const result = await store.add({ text, category, key, source, confidence, ttl, expiresAt, expiresIn, tags });
+      const result = await store.add(input);
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       break;
     }
@@ -59,10 +191,104 @@ async function main(): Promise<void> {
       process.stdout.write(`${JSON.stringify(await store.stats(), null, 2)}\n`);
       break;
     }
+    case 'get': {
+      const id = positional[1];
+      if (!id) throw new Error(`get requires <id>\n${usage()}`);
+      const edict = await store.get(id);
+      if (!edict) throw new EdictNotFoundError(id);
+      if (hasFlag(args, '--plain')) {
+        process.stdout.write(`${printEdictPlain(edict)}\n`);
+      } else {
+        process.stdout.write(`${JSON.stringify(edict, null, 2)}\n`);
+      }
+      break;
+    }
+    case 'remove': {
+      const id = positional[1];
+      if (!id) throw new Error(`remove requires <id>\n${usage()}`);
+      const result = await store.remove(id);
+      if (!result.found || !result.edict) throw new EdictNotFoundError(id);
+      process.stdout.write(`Removed ${result.edict.id}: ${result.edict.text}\n`);
+      break;
+    }
+    case 'update': {
+      const id = positional[1];
+      if (!id) throw new Error(`update requires <id>\n${usage()}`);
+      const patch = buildPatch(args);
+      if (Object.keys(patch).length === 0) {
+        throw new Error(`update requires at least one field to change\n${usage()}`);
+      }
+      const result = await store.update(id, patch);
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      break;
+    }
+    case 'search': {
+      const query = positional.slice(1).join(' ');
+      if (!query) throw new Error(`search requires <query>\n${usage()}`);
+      const results = await store.search(query);
+      if (hasFlag(args, '--json')) {
+        process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);
+      } else if (results.length > 0) {
+        process.stdout.write(`${renderPlain(results)}\n`);
+      }
+      break;
+    }
+    case 'review': {
+      const staleDays = takeFlag(args, '--stale-days');
+      const includePermanent = hasFlag(args, '--include-permanent');
+      const reviewStore = staleDays !== undefined
+        ? new EdictStore({ path, format, staleThresholdDays: Number(staleDays) })
+        : store;
+      if (reviewStore !== store) {
+        await reviewStore.load();
+      }
+      const review = enrichReview(await reviewStore.review(), reviewStore, includePermanent);
+      if (hasFlag(args, '--json')) {
+        process.stdout.write(`${JSON.stringify(review, null, 2)}\n`);
+      } else {
+        process.stdout.write(printReviewPlain(review));
+      }
+      break;
+    }
+    case 'export': {
+      const exportFormat = parseStoreFormat(takeFlag(args, '--format')) ?? 'yaml';
+      const output = takeFlag(args, '--output');
+      const serialized = await exportSchema(store.exportData(), exportFormat);
+      if (output) {
+        await writeFile(output, serialized, 'utf8');
+      } else {
+        process.stdout.write(serialized);
+      }
+      break;
+    }
+    case 'import': {
+      const file = positional[1];
+      if (!file) throw new Error(`import requires <file>\n${usage()}`);
+      const merge = hasFlag(args, '--merge') || !hasFlag(args, '--replace');
+      const imported = await loadImportFile(file);
+      let data = imported;
+
+      if (merge) {
+        const current = store.exportData();
+        const historyById = new Map([...current.history, ...(imported.history ?? [])].map((entry) => [entry.id, entry]));
+        const edictById = new Map([...current.edicts, ...(imported.edicts ?? [])].map((edict) => [edict.id, edict]));
+        data = {
+          version: imported.version ?? current.version,
+          config: imported.config ?? current.config,
+          edicts: [...edictById.values()],
+          history: [...historyById.values()],
+        };
+      }
+
+      const result = await store.importData(data);
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      break;
+    }
+    case undefined:
+      process.stdout.write(`${usage()}\n`);
+      break;
     default:
-      process.stdout.write(
-        'Usage: edicts [--path FILE] [--format yaml|json] <add|list|stats> [options]\n'
-      );
+      process.stdout.write(`${usage()}\n`);
   }
 }
 

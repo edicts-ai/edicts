@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile as execFileCb } from 'node:child_process';
@@ -193,5 +193,177 @@ describe('edicts CLI', () => {
       cwd: process.cwd(),
     });
     expect(stats.stdout).toContain('"total": 1');
+  });
+
+  it('get returns JSON for an existing id', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const added = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'CLI fact', '--category', 'product'], { cwd: process.cwd() });
+    const edict = JSON.parse(added.stdout);
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'get', edict.edict.id], { cwd: process.cwd() });
+
+    expect(JSON.parse(result.stdout)).toMatchObject({ id: edict.edict.id, text: 'CLI fact', category: 'product' });
+  });
+
+  it('get returns plain output with --plain', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const added = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Plain fact', '--category', 'product'], { cwd: process.cwd() });
+    const edict = JSON.parse(added.stdout);
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'get', edict.edict.id, '--plain'], { cwd: process.cwd() });
+
+    expect(result.stdout).toContain('Plain fact');
+    expect(result.stdout).toContain('product');
+  });
+
+  it('get on nonexistent id exits 1 with stderr message', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'get', 'missing'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Edict not found'),
+    });
+  });
+
+  it('remove deletes an edict and confirms what was removed', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const added = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Remove me', '--category', 'product'], { cwd: process.cwd() });
+    const edict = JSON.parse(added.stdout);
+
+    const removed = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'remove', edict.edict.id], { cwd: process.cwd() });
+    expect(removed.stdout).toContain('Remove me');
+
+    const list = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'list', '--json'], { cwd: process.cwd() });
+    expect(JSON.parse(list.stdout)).toEqual([]);
+  });
+
+  it('remove on nonexistent id exits 1', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'remove', 'missing'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Edict not found'),
+    });
+  });
+
+  it('update partially updates fields and preserves unspecified ones', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const added = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Original', '--category', 'Product', '--tags', 'one,two', '--source', 'seed'], { cwd: process.cwd() });
+    const edict = JSON.parse(added.stdout).edict;
+
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'update', edict.id, '--text', 'Updated'], { cwd: process.cwd() });
+    const fetched = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'get', edict.id], { cwd: process.cwd() });
+
+    expect(JSON.parse(fetched.stdout)).toMatchObject({
+      id: edict.id,
+      text: 'Updated',
+      category: 'product',
+      tags: ['one', 'two'],
+      source: 'seed',
+    });
+  });
+
+  it('update on nonexistent id exits 1', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'update', 'missing', '--text', 'Updated'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Edict not found'),
+    });
+  });
+
+  it('search finds matching edicts', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Casper launch plan', '--category', 'product', '--tags', 'roadmap'], { cwd: process.cwd() });
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Team sync', '--category', 'team'], { cwd: process.cwd() });
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'search', 'casper'], { cwd: process.cwd() });
+    expect(result.stdout).toContain('Casper launch plan');
+    expect(result.stdout).not.toContain('Team sync');
+  });
+
+  it('search with no matches returns empty output in plain mode', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Something else', '--category', 'team'], { cwd: process.cwd() });
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'search', 'nomatch'], { cwd: process.cwd() });
+    expect(result.stdout).toBe('');
+  });
+
+  it('review returns stale, expired, and compaction candidates', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const store = new EdictStore({ path });
+    await store.load();
+    await store.add({ text: 'Stale durable', category: 'product', key: 'dup/a', ttl: 'durable' });
+    await store.add({ text: 'Dup durable', category: 'product', key: 'dup/b', ttl: 'durable' });
+    await store.add({ text: 'Expired event', category: 'ops', ttl: 'event', expiresAt: new Date(Date.now() - 60_000).toISOString() });
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'review', '--stale-days', '0', '--json'], { cwd: process.cwd() });
+    const review = JSON.parse(result.stdout);
+
+    expect(review.stale.length).toBeGreaterThan(0);
+    expect(review.expired.length).toBeGreaterThan(0);
+    expect(review.compactionCandidates.length).toBeGreaterThan(0);
+  });
+
+  it('export writes YAML to a file', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const output = join(tempDir, 'export.yaml');
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Exported fact', '--category', 'product'], { cwd: process.cwd() });
+
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'export', '--output', output], { cwd: process.cwd() });
+
+    const content = await readFile(output, 'utf8');
+    expect(content).toContain('Exported fact');
+    expect(content).toContain('version: 1');
+  });
+
+  it('import restores exported edicts', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const exported = join(tempDir, 'export.yaml');
+    const replacement = join(tempDir, 'replacement.yaml');
+
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Roundtrip fact', '--category', 'product'], { cwd: process.cwd() });
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'export', '--output', exported], { cwd: process.cwd() });
+
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', replacement, 'import', exported], { cwd: process.cwd() });
+    const list = await execFile('npx', ['tsx', 'src/cli.ts', '--path', replacement, 'list', '--json'], { cwd: process.cwd() });
+
+    expect(JSON.parse(list.stdout)).toMatchObject([
+      expect.objectContaining({ text: 'Roundtrip fact', category: 'product' }),
+    ]);
+  });
+
+  it('add without required flags exits 1 with a usage hint', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--category', 'product'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('add requires'),
+    });
+  });
+
+  it('unknown command prints usage', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'wat'], { cwd: process.cwd() });
+
+    expect(result.stdout).toContain('Usage: edicts');
+  });
+
+  it('invalid --format value exits 1', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, '--format', 'toml', 'list'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('Invalid format'),
+    });
+  });
+
+  it('nonexistent parent dir in --path exits 1', async () => {
+    const path = join(tempDir, 'missing-dir', 'cli-edicts.yaml');
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'oops', '--category', 'product'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+    });
   });
 });
