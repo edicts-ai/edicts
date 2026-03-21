@@ -60,5 +60,7 @@
     const expanded = toggle.getAttribute('aria-expanded') === 'true';
     toggle.setAttribute('aria-expanded', String(!expanded));
     menu?.classList.toggle('hidden');
+    toggle.querySelector('.hamburger-line')?.classList.toggle('hidden');
+    toggle.querySelector('.close-line')?.classList.toggle('hidden');
   });
 </script>
