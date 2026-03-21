@@ -48,6 +48,7 @@ function usage(): string {
     '  review [--stale-days N] [--include-permanent] [--json]',
     '  export [--format json|yaml] [--output FILE]',
     '  import <file> [--merge|--replace]',
+    '  init [--path FILE]  Create a starter edicts.yaml in the current directory',
   ].join('\n');
 }
 
@@ -165,6 +166,39 @@ async function main(): Promise<void> {
   const format = parseStoreFormat(takeFlag(args, '--format'));
   const positional = takePositional(args);
   const cmd = positional[0];
+
+  // Handle init before loading store (file may not exist yet)
+  if (cmd === 'init') {
+    const { existsSync } = await import('node:fs');
+    if (existsSync(path)) {
+      process.stderr.write(`${path} already exists. Use --path to specify a different file.\n`);
+      process.exitCode = 1;
+      return;
+    }
+    const now = new Date().toISOString();
+    const template = [
+      'version: 1',
+      'config:',
+      '  maxEdicts: 200',
+      '  tokenBudget: 4000',
+      '  categories: []',
+      'edicts:',
+      '  - id: e_001',
+      '    text: "Replace this with your first edict"',
+      '    category: general',
+      '    tags: []',
+      '    confidence: verified',
+      '    source: manual',
+      '    ttl: durable',
+      `    created: "${now}"`,
+      `    updated: "${now}"`,
+      'history: []',
+      '',
+    ].join('\n');
+    await writeFile(path, template, 'utf-8');
+    process.stdout.write(`Created ${path}\n`);
+    return;
+  }
 
   const store = new EdictStore({ path, format });
   await store.load();
