@@ -216,6 +216,17 @@ describe('edicts CLI', () => {
     expect(result.stdout).toContain('product');
   });
 
+  it('get accepts boolean flags before the positional id', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const added = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'CLI fact', '--category', 'product'], { cwd: process.cwd() });
+    const edict = JSON.parse(added.stdout);
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'get', '--plain', edict.edict.id], { cwd: process.cwd() });
+
+    expect(result.stdout).toContain('CLI fact');
+    expect(result.stdout).toContain('product');
+  });
+
   it('get on nonexistent id exits 1 with stderr message', async () => {
     const path = join(tempDir, 'cli-edicts.yaml');
 
@@ -282,6 +293,17 @@ describe('edicts CLI', () => {
     expect(result.stdout).not.toContain('Team sync');
   });
 
+  it('search accepts boolean flags before the positional query', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Casper launch plan', '--category', 'product'], { cwd: process.cwd() });
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'search', '--json', 'casper'], { cwd: process.cwd() });
+
+    expect(JSON.parse(result.stdout)).toMatchObject([
+      expect.objectContaining({ text: 'Casper launch plan', category: 'product' }),
+    ]);
+  });
+
   it('search with no matches returns empty output in plain mode', async () => {
     const path = join(tempDir, 'cli-edicts.yaml');
     await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Something else', '--category', 'team'], { cwd: process.cwd() });
@@ -304,6 +326,19 @@ describe('edicts CLI', () => {
     expect(review.stale.length).toBeGreaterThan(0);
     expect(review.expired.length).toBeGreaterThan(0);
     expect(review.compactionCandidates.length).toBeGreaterThan(0);
+  });
+
+  it('review plain output does not duplicate compaction candidate counts', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const store = new EdictStore({ path, staleThresholdDays: 0 });
+    await store.load();
+    await store.add({ text: 'Stale durable', category: 'product', key: 'dup/a', ttl: 'durable' });
+    await store.add({ text: 'Dup durable', category: 'product', key: 'dup/b', ttl: 'durable' });
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'review'], { cwd: process.cwd() });
+
+    expect(result.stdout).toContain('duplicates: 1');
+    expect(result.stdout).not.toContain('compactionCandidates:');
   });
 
   it('export writes YAML to a file', async () => {

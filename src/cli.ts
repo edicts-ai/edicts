@@ -16,16 +16,18 @@ function hasFlag(args: string[], name: string): boolean {
   return args.includes(name);
 }
 
+const BOOLEAN_FLAGS = new Set(['--json', '--plain', '--include-permanent', '--replace', '--merge']);
+
 function takePositional(args: string[]): string[] {
   const positionals: string[] = [];
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (arg.startsWith('--')) {
-      index += 1;
+      if (!BOOLEAN_FLAGS.has(arg)) {
+        index += 1;
+      }
       continue;
     }
-    const prev = args[index - 1];
-    if (prev && prev.startsWith('--')) continue;
     positionals.push(arg);
   }
   return positionals;
@@ -139,7 +141,6 @@ function printReviewPlain(review: ReturnType<typeof enrichReview>): string {
   for (const group of review.duplicates) {
     lines.push(`  - ${group.category}/${group.keyPrefix}: ${group.edicts.map((edict) => edict.id).join(', ')}`);
   }
-  lines.push(`compactionCandidates: ${review.compactionCandidates.length}`);
   return `${lines.join('\n')}\n`;
 }
 
