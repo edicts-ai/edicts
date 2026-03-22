@@ -31,7 +31,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Publish
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Publish disabled — currently publishing manually.
+      # Uncomment and add NPM_TOKEN secret to enable automated publishing.
+      # - name: Publish
+      #   run: npm publish --provenance --access public
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

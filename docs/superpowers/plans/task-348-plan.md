@@ -338,12 +338,12 @@ curl -s -X POST \
   }'
 ```
 
-Expected: 201 Created with repo URL `https://github.com/mssteuer/edicts.ai`
+Expected: 201 Created with repo URL `https://github.com/edicts-ai/edicts.ai`
 
 - [ ] **Step 2: Verify repo was created**
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $TOKEN" https://api.github.com/repos/mssteuer/edicts.ai
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $TOKEN" https://api.github.com/repos/edicts-ai/edicts.ai
 ```
 
 Expected: `200`
@@ -455,7 +455,7 @@ import Layout from '../layouts/Layout.astro';
   <main>
     <h1>Edicts</h1>
     <p>Ground truth layer for AI agents.</p>
-    <p><a href="https://github.com/mssteuer/edicts">GitHub</a> · <a href="https://www.npmjs.com/package/edicts">npm</a></p>
+    <p><a href="https://github.com/edicts-ai/edicts">GitHub</a> · <a href="https://www.npmjs.com/package/edicts">npm</a></p>
   </main>
 </Layout>
 ```
@@ -577,7 +577,7 @@ git branch -M main
 ```bash
 cd /home/jeanclaude/workspace/edicts.ai
 TOKEN=$(cd /home/jeanclaude/workspace/edicts && git remote get-url origin | grep -oP 'github_pat_[^@]+')
-git remote add origin "https://x-access-token:${TOKEN}@github.com/mssteuer/edicts.ai.git"
+git remote add origin "https://x-access-token:${TOKEN}@github.com/edicts-ai/edicts.ai.git"
 ```
 
 - [ ] **Step 3: Commit all files**
@@ -611,7 +611,7 @@ TOKEN=$(cd /home/jeanclaude/workspace/edicts && git remote get-url origin | grep
 curl -s -X POST \
   -H "Authorization: token $TOKEN" \
   -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/mssteuer/edicts.ai/pages \
+  https://api.github.com/repos/edicts-ai/edicts.ai/pages \
   -d '{"build_type": "workflow"}'
 ```
 
@@ -621,7 +621,7 @@ Expected: 201 Created or 409 (already configured).
 
 ```bash
 curl -s -H "Authorization: token $TOKEN" \
-  https://api.github.com/repos/mssteuer/edicts.ai/pages \
+  https://api.github.com/repos/edicts-ai/edicts.ai/pages \
   | grep -E '"status"|"url"'
 ```
 
@@ -636,7 +636,7 @@ curl -s -H "Authorization: token $TOKEN" \
 ```bash
 TOKEN=$(cd /home/jeanclaude/workspace/edicts && git remote get-url origin | grep -oP 'github_pat_[^@]+')
 curl -s -H "Authorization: token $TOKEN" \
-  https://api.github.com/repos/mssteuer/edicts/actions/workflows \
+  https://api.github.com/repos/edicts-ai/edicts/actions/workflows \
   | grep '"name"'
 ```
 
@@ -646,7 +646,7 @@ Expected: Shows "CI" and "Publish" workflows.
 
 ```bash
 curl -s -H "Authorization: token $TOKEN" \
-  https://api.github.com/repos/mssteuer/openclaw-plugin-edicts/actions/workflows \
+  https://api.github.com/repos/edicts-ai/openclaw-plugin-edicts/actions/workflows \
   | grep '"name"'
 ```
 
@@ -656,7 +656,7 @@ Expected: Shows "CI" and "Publish" workflows.
 
 ```bash
 curl -s -H "Authorization: token $TOKEN" \
-  https://api.github.com/repos/mssteuer/edicts.ai/actions/workflows \
+  https://api.github.com/repos/edicts-ai/edicts.ai/actions/workflows \
   | grep '"name"'
 ```
 
@@ -666,7 +666,7 @@ Expected: Shows "Deploy to GitHub Pages" workflow.
 
 ```bash
 curl -s -H "Authorization: token $TOKEN" \
-  "https://api.github.com/repos/mssteuer/edicts/actions/runs?per_page=1" \
+  "https://api.github.com/repos/edicts-ai/edicts/actions/runs?per_page=1" \
   | grep -E '"status"|"conclusion"|"name"'
 ```
 
@@ -678,12 +678,12 @@ Expected: CI run triggered, status shows "completed" or "in_progress".
 
 These require account-level access and cannot be automated:
 
-1. **NPM_TOKEN secret** — Add to both `mssteuer/edicts` and `mssteuer/openclaw-plugin-edicts`:
+1. **NPM_TOKEN secret** — Add to both `edicts-ai/edicts` and `edicts-ai/openclaw-plugin-edicts`:
    - Go to repo → Settings → Secrets and variables → Actions → New repository secret
    - Name: `NPM_TOKEN`, Value: npm access token with publish permission
    - Generate token at https://www.npmjs.com/settings/tokens
 
 2. **Custom domain** (optional, later) — To use `edicts.ai` with GitHub Pages:
-   - Add CNAME record: `edicts.ai` → `mssteuer.github.io`
+   - Add CNAME record: `edicts.ai` → `edicts-ai.github.io`
    - Add `CNAME` file to `public/` with content `edicts.ai`
    - Enable "Enforce HTTPS" in repo Pages settings

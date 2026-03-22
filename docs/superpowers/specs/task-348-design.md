@@ -12,9 +12,9 @@ Set up CI/CD pipelines for all three Edicts repositories. Two repos already exis
 
 | Repo | URL | Package | Deploy Target |
 |------|-----|---------|---------------|
-| `edicts` | `github.com/mssteuer/edicts` | `edicts` on npm | npm publish on tag |
-| `openclaw-plugin-edicts` | `github.com/mssteuer/openclaw-plugin-edicts` | `openclaw-plugin-edicts` on npm | npm publish on tag |
-| `edicts.ai` | `github.com/mssteuer/edicts.ai` (to create) | N/A | GitHub Pages auto-deploy |
+| `edicts` | `github.com/edicts-ai/edicts` | `edicts` on npm | npm publish on tag |
+| `openclaw-plugin-edicts` | `github.com/edicts-ai/openclaw-plugin-edicts` | `openclaw-plugin-edicts` on npm | npm publish on tag |
+| `edicts.ai` | `github.com/edicts-ai/edicts.ai` (to create) | N/A | GitHub Pages auto-deploy |
 
 All repos transfer to `edicts-ai` org when created.
 
@@ -68,7 +68,7 @@ Same pattern as core — tag-triggered, npm provenance, `NPM_TOKEN` secret.
 
 ### Repository Creation
 
-Create `mssteuer/edicts.ai` as a public repo with:
+Create `edicts-ai/edicts.ai` as a public repo with:
 - MIT license
 - Astro static site scaffold
 - GitHub Pages configuration
@@ -136,6 +136,6 @@ Pages source must be set to "GitHub Actions" (not branch-based). This is configu
 2. `edicts` repo: Publish workflow publishes to npm on `v*` tag push
 3. `openclaw-plugin-edicts` repo: CI workflow runs lint, typecheck, tests, build on push/PR to default branch
 4. `openclaw-plugin-edicts` repo: Publish workflow publishes to npm on `v*` tag push
-5. `edicts.ai` repo created at `mssteuer/edicts.ai` with Astro scaffold
+5. `edicts.ai` repo created at `edicts-ai/edicts.ai` with Astro scaffold
 6. `edicts.ai` repo: GitHub Pages deployment workflow on push to main
 7. All CI workflows committed and pushed to respective repos

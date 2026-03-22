@@ -174,5 +174,5 @@ Not glamorous. Just useful.
 If you need a small set of verified truths to follow your agents around without dragging a wagon of context behind them, that is exactly what we built.
 
 - Docs: https://edicts.ai
-- GitHub: https://github.com/mssteuer/edicts
+- GitHub: https://github.com/edicts-ai/edicts
 - License: MIT
