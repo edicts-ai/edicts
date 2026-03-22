@@ -2,6 +2,7 @@
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { EdictStore } from './store.js';
 import type { Edict, EdictFileSchema, EdictInput, ReviewResult } from './types.js';
@@ -51,6 +52,7 @@ function usage(): string {
     '  export [--format json|yaml] [--output FILE]',
     '  import <file> [--merge|--replace]',
     '  init [--path FILE]  Create a starter edicts.yaml in the current directory',
+    '  version             Print version',
   ].join('\n');
 }
 
@@ -189,6 +191,13 @@ async function main(): Promise<void> {
   const format = parseStoreFormat(takeFlag(args, '--format'));
   const positional = takePositional(args);
   const cmd = positional[0];
+
+  if (cmd === 'version' || cmd === '--version' || cmd === '-v') {
+    const require = createRequire(import.meta.url);
+    const pkg = require('../package.json') as { version: string };
+    process.stdout.write(`edicts v${pkg.version}\n`);
+    return;
+  }
 
   // Handle init before loading store (file may not exist yet)
   if (cmd === 'init') {
