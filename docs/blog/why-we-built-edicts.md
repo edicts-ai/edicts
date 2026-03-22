@@ -149,6 +149,44 @@ If your stack can:
 then you can integrate Edicts.
 
 That is why the core stays small and boring. OpenClaw has a first-party integration because it is useful, but the store itself does not depend on OpenClaw or any orchestration framework. 
+## Getting started with OpenClaw
+
+If you are running [OpenClaw](https://openclaw.ai), Edicts has a first-party plugin that handles everything: injection, tool registration, and file bootstrapping.
+
+Install and restart:
+
+```bash
+openclaw plugins install openclaw-plugin-edicts
+openclaw gateway restart
+```
+
+That is it. On first load, the plugin creates an `edicts.yaml` file in your workspace. Every agent session — main chat, cron jobs, sub-agents, every channel — gets the edicts prepended to its system prompt automatically. No per-session wiring.
+
+Your agents also get tools (`edicts_add`, `edicts_list`, `edicts_update`, `edicts_remove`, `edicts_search`, `edicts_stats`, `edicts_review`) so they can manage edicts conversationally. Say "remember that v2.2.0 launches March 23" and the agent writes it to the store.
+
+You can also edit `edicts.yaml` by hand. It is a plain YAML file:
+
+```yaml
+version: 1
+edicts:
+  - id: e_001
+    text: "Product v2.2.0 launches March 23, 2026."
+    category: product
+    ttl: event
+    key: product-launch-date
+```
+
+If you are not on OpenClaw, install the standalone library:
+
+```bash
+npm install edicts
+edicts init        # creates starter edicts.yaml
+edicts add "Feature X does NOT support gas sponsorship" --category product
+edicts list
+```
+
+The core library has zero framework dependencies. Any agent system that can prepend text to a system prompt can use it.
+
 ## What Edicts is not
 
 Edicts is not an attempt to replace RAG.
