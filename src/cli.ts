@@ -203,6 +203,19 @@ async function main(): Promise<void> {
   const store = new EdictStore({ path, format });
   await store.load();
 
+  // Warn on read commands if no edicts file exists on disk
+  const readCmds = ['list', 'stats', 'search', 'review', 'export'];
+  if (readCmds.includes(cmd)) {
+    const { access } = await import('node:fs/promises');
+    try {
+      await access(path);
+    } catch {
+      process.stderr.write(`No edicts file found at ${path}\nRun 'edicts init' to create one, or use --path to specify a location.\n`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   switch (cmd) {
     case 'add': {
       const input = buildInput(args);
