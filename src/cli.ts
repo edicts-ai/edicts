@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, access } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { EdictStore } from './store.js';
 import type { Edict, EdictFileSchema, EdictInput, ReviewResult } from './types.js';
@@ -50,6 +52,26 @@ function usage(): string {
     '  import <file> [--merge|--replace]',
     '  init [--path FILE]  Create a starter edicts.yaml in the current directory',
   ].join('\n');
+}
+
+/**
+ * Walk up the directory tree looking for edicts.yaml or edicts.json,
+ * similar to how git finds .git/. Returns the first match or null.
+ */
+function findEdictsFile(startDir: string): string | null {
+  let dir = resolve(startDir);
+  const root = dirname(dir) === dir ? dir : undefined; // handle edge
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    for (const name of ['edicts.yaml', 'edicts.yml', 'edicts.json']) {
+      const candidate = join(dir, name);
+      if (existsSync(candidate)) return candidate;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break; // filesystem root
+    dir = parent;
+  }
+  return null;
 }
 
 function parseStoreFormat(value: string | undefined): 'yaml' | 'json' | undefined {
@@ -162,14 +184,14 @@ async function loadImportFile(file: string): Promise<EdictFileSchema> {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const path = takeFlag(args, '--path') ?? './edicts.yaml';
+  const explicitPath = takeFlag(args, '--path');
+  const path = explicitPath ?? findEdictsFile(process.cwd()) ?? './edicts.yaml';
   const format = parseStoreFormat(takeFlag(args, '--format'));
   const positional = takePositional(args);
   const cmd = positional[0];
 
   // Handle init before loading store (file may not exist yet)
   if (cmd === 'init') {
-    const { existsSync } = await import('node:fs');
     if (existsSync(path)) {
       process.stderr.write(`${path} already exists. Use --path to specify a different file.\n`);
       process.exitCode = 1;
@@ -206,11 +228,10 @@ async function main(): Promise<void> {
   // Warn on read commands if no edicts file exists on disk
   const readCmds = ['list', 'stats', 'search', 'review', 'export'];
   if (readCmds.includes(cmd)) {
-    const { access } = await import('node:fs/promises');
     try {
       await access(path);
     } catch {
-      process.stderr.write(`No edicts file found at ${path}\nRun 'edicts init' to create one, or use --path to specify a location.\n`);
+      process.stderr.write(`No edicts file found (searched from ${process.cwd()} to /)\nRun 'edicts init' to create one, or use --path to specify a location.\n`);
       process.exitCode = 1;
       return;
     }
