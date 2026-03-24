@@ -39,3 +39,9 @@ The build command is `tsup` (via `npm run build`). Do NOT use `vite build`.
 - History entries use timestamped IDs to avoid collisions: `{id}__{timestamp}_{version}`
 - Token budget enforcement: rollback on exceeded (no partial state)
 - The `render()` method updates `lastAccessed` on all edicts (marks store dirty)
+
+
+## Code Style — Section Comments
+**NEVER use `=====` or `-----` in section divider comments.**
+Agents and tools confuse them with git merge conflict markers.
+Use this format instead: `// — Section Name`
