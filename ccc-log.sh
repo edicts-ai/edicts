@@ -15,9 +15,16 @@ CCC_URL="${CCC_URL:-http://localhost:18500}"
 
 # Fall back to config file if env var not set
 if [ -z "$CCC_API_KEY" ]; then
-  CONFIG_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config/local.yaml"
-  if [ -f "$CONFIG_FILE" ]; then
-    CCC_API_KEY=$(grep 'key:' "$CONFIG_FILE" | head -1 | sed 's/.*key: *"//' | sed 's/".*//')
+  # Read from secrets file (canonical location, always present)
+  SECRETS_FILE="$HOME/.openclaw/workspace/.secrets/ccc-api-key.txt"
+  if [ -f "$SECRETS_FILE" ]; then
+    CCC_API_KEY=$(cat "$SECRETS_FILE")
+  else
+    # Fallback: parse apiKeys section from CCC config — awk avoids matching keyFile: line
+    CONFIG_FILE="/home/jeanclaude/workspace/claw-command-center/config/local.yaml"
+    if [ -f "$CONFIG_FILE" ]; then
+      CCC_API_KEY=$(awk '/^[[:space:]]*apiKeys:/,/^[^[:space:]]/{if(/^\s*- key:/) print}' "$CONFIG_FILE" | head -1 | sed 's/.*key: *"//' | sed 's/".*//')
+    fi
   fi
 fi
 
