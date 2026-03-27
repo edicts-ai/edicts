@@ -58,9 +58,7 @@ const rules = edicts.map(e => `- [${e.category}] ${e.text}`).join('\n');
 const systemPrompt = `You are a helpful assistant.
 
 ## Standing Rules
-${rules}
-
-Treat these as ground truth. Never contradict them.`;
+${rules}`;
 ```
 
 That is the whole idea: small verified facts, cheap enough to include all the time.
