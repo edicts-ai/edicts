@@ -401,4 +401,84 @@ describe('edicts CLI', () => {
       code: 1,
     });
   });
+
+  it('compact merges multiple edicts into one', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const r1 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'First version', '--category', 'product', '--key', 'launch-date/v1'], { cwd: process.cwd() });
+    const r2 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Second version', '--category', 'product', '--key', 'launch-date/v2'], { cwd: process.cwd() });
+    const id1 = JSON.parse(r1.stdout).edict.id as string;
+    const id2 = JSON.parse(r2.stdout).edict.id as string;
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'compact', id1, id2, '--text', 'Merged version'], { cwd: process.cwd() });
+    const compacted = JSON.parse(result.stdout);
+
+    expect(compacted.action).toBe('created');
+    expect(compacted.edict.text).toBe('Merged version');
+    expect(compacted.edict.category).toBe('product');
+
+    // After compaction: only the merged edict should remain (id2 is gone, id1 key re-used by merged)
+    const list = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'list', '--json'], { cwd: process.cwd() });
+    const remaining = JSON.parse(list.stdout) as Array<{ id: string; text: string }>;
+
+    // Only 1 edict should remain with the merged text
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].text).toBe('Merged version');
+    // The merged edict should not retain the 'Second version' text (id2 gone)
+    expect(remaining.some((e) => e.text === 'Second version')).toBe(false);
+  });
+
+  it('compact --dry-run shows merged input without modifying the store', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const r1 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'A fact', '--category', 'product', '--key', 'fact/v1'], { cwd: process.cwd() });
+    const r2 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'B fact', '--category', 'product', '--key', 'fact/v2'], { cwd: process.cwd() });
+    const id1 = JSON.parse(r1.stdout).edict.id as string;
+    const id2 = JSON.parse(r2.stdout).edict.id as string;
+
+    const dry = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'compact', id1, id2, '--text', 'Dry merged', '--dry-run'], { cwd: process.cwd() });
+    expect(dry.stdout).toContain('DRY RUN');
+    expect(dry.stdout).toContain('Dry merged');
+
+    // Originals should still be present
+    const list = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'list', '--json'], { cwd: process.cwd() });
+    const remaining = JSON.parse(list.stdout) as Array<{ id: string }>;
+    const ids = remaining.map((e) => e.id);
+    expect(ids).toContain(id1);
+    expect(ids).toContain(id2);
+  });
+
+  it('compact exits 1 when fewer than 2 IDs are given', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Lone fact', '--category', 'product'], { cwd: process.cwd() });
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'compact', 'e_001', '--text', 'Only one'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('at least 2'),
+    });
+  });
+
+  it('compact exits 1 when --text is missing', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const r1 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Fact one', '--category', 'product'], { cwd: process.cwd() });
+    const r2 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Fact two', '--category', 'product'], { cwd: process.cwd() });
+    const id1 = JSON.parse(r1.stdout).edict.id as string;
+    const id2 = JSON.parse(r2.stdout).edict.id as string;
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'compact', id1, id2], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('--text'),
+    });
+  });
+
+  it('compact exits 1 when edicts span different categories', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const r1 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Product fact', '--category', 'product'], { cwd: process.cwd() });
+    const r2 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Team fact', '--category', 'team'], { cwd: process.cwd() });
+    const id1 = JSON.parse(r1.stdout).edict.id as string;
+    const id2 = JSON.parse(r2.stdout).edict.id as string;
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'compact', id1, id2, '--text', 'Cross-category merge'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('same category'),
+    });
+  });
 });
