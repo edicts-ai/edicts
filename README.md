@@ -44,7 +44,7 @@ List it with the CLI:
 npx edicts list
 ```
 
-Inject it into your system prompt:
+Use it in your system prompt:
 
 ```ts
 import { EdictStore } from 'edicts';

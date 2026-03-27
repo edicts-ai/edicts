@@ -1,7 +1,7 @@
 {
   "id": "openclaw-plugin-edicts",
   "name": "Edicts OpenClaw Integration",
-  "description": "Inject Edicts into OpenClaw prompts and expose Edicts CRUD/search tools. Keep configSchema in sync with src/openclaw/schema.ts.",
+  "description": "Ground truth for AI agents — provide verified facts in system context and expose read/search tools. Write tools are opt-in. Keep configSchema in sync with src/openclaw/schema.ts.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

@@ -1,7 +1,7 @@
 ---
 name: openclaw-plugin-edicts
-description: "Ground truth layer for AI agents — inject verified facts into every prompt and expose CRUD/search tools for runtime edict management. No more hallucinated dates, names, or constraints."
-version: "1.0.3"
+description: "Ground truth layer for AI agents — provide verified facts in every prompt and expose read/search tools for edict management. Write tools are opt-in. No more hallucinated dates, names, or constraints."
+version: "1.0.5"
 homepage: https://edicts.ai
 license: MIT
 metadata:
@@ -42,8 +42,8 @@ openclaw plugins install clawhub:openclaw-plugin-edicts
 
 ## What It Does
 
-1. **Injects facts into every prompt** — edicts appear in system context automatically
-2. **Exposes CRUD tools** — agents can list, add, update, remove, and search edicts at runtime
+1. **Provides facts in every prompt** — edicts appear in system context automatically
+2. **Read-only by default** — agents can list and search edicts; write tools are opt-in
 3. **Categorized and typed** — each edict has category, confidence level, TTL, and optional expiry
 4. **Token-efficient** — compact YAML/JSON storage, configurable token budget and category limits
 
@@ -111,9 +111,9 @@ In your `openclaw.json` under `plugins.entries`:
 
 ## Security and Trust Model
 
-**You control what gets injected.** Edicts are stored in a local file in your workspace. Only content you (or your agent, if you grant tool access) write to that file appears in prompts. No remote fetch, no external data sources, no network calls.
+**You control what appears in context.** Edicts are stored in a local file in your workspace. Only content you write to that file appears in prompts. No remote fetch, no external data sources, no network calls.
 
-**Runtime tools are opt-in.** Write tools (`edicts_add`, `edicts_update`, `edicts_remove`) let agents establish persistent ground truth. This is powerful but privileged. Lock it down with:
+**Write tools are opt-in.** By default, only read tools are active. Write tools (`edicts_add`, `edicts_update`, `edicts_remove`) must be explicitly enabled if you want agents to create or modify edicts. Configuration options:
 
 - `tools.enabled: false` — read-only prompt injection, no agent mutation
 - `tools.names: [edicts_list, edicts_search]` — whitelist read-only tools
