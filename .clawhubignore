@@ -7,3 +7,5 @@ coverage/
 .secrets/
 website/
 tests/
+docs/superpowers/
+docs/blog/
