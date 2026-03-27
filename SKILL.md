@@ -1,7 +1,7 @@
 ---
 name: openclaw-plugin-edicts
 description: "Ground truth layer for AI agents — inject verified facts into every prompt and expose CRUD/search tools for runtime edict management. No more hallucinated dates, names, or constraints."
-version: "1.0.2"
+version: "1.0.3"
 homepage: https://edicts.ai
 license: MIT
 metadata:
@@ -108,6 +108,19 @@ In your `openclaw.json` under `plugins.entries`:
 - **Migration status** — "Database migration complete as of March 1"
 - **Embargoes** — "Do not discuss partnership until press release on April 5"
 - **Engagement rules** — "Do not engage with @trollaccount on X"
+
+## Security and Trust Model
+
+**You control what gets injected.** Edicts are stored in a local file in your workspace. Only content you (or your agent, if you grant tool access) write to that file appears in prompts. No remote fetch, no external data sources, no network calls.
+
+**Runtime tools are opt-in.** Write tools (`edicts_add`, `edicts_update`, `edicts_remove`) let agents establish persistent ground truth. This is powerful but privileged. Lock it down with:
+
+- `tools.enabled: false` — read-only prompt injection, no agent mutation
+- `tools.names: [edicts_list, edicts_search]` — whitelist read-only tools
+- `autoSave: false` — runtime changes don't persist across sessions
+- `includeSystemContext: false` — tools without prompt injection
+
+Safest config: `tools.enabled: false` + `autoSave: false` — your curated file, injected as-is, no runtime changes possible.
 
 ## Links
 

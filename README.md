@@ -178,6 +178,22 @@ Full docs at **https://edicts.ai**:
 - [Generic Integration](https://edicts.ai/docs/integrations/generic/)
 - [OpenClaw Integration](https://edicts.ai/docs/integrations/openclaw/)
 
+## Security and Trust Model
+
+Edicts injects content into your agent's system prompt. This is the core feature — it's how ground truth reaches the model. Here's how trust works:
+
+**You control what gets injected.** Edicts are stored in a local YAML or JSON file in your workspace. Only content you (or your agent, if you grant tool access) write to that file appears in prompts. There is no remote fetch, no external data source, and no network calls — it's your file, your facts, your system prompt.
+
+**Runtime tools are opt-in and configurable.** The OpenClaw plugin exposes tools that let agents add, update, and remove edicts at runtime. This is powerful (agents can establish persistent ground truth) but also a privileged capability. You can:
+
+- **Disable write tools entirely:** set `tools.enabled: false` in plugin config
+- **Whitelist specific tools:** use `tools.names` to allow only read operations (`edicts_list`, `edicts_search`, `edicts_stats`)
+- **Disable auto-save:** set `autoSave: false` so runtime changes don't persist across sessions
+- **Disable context injection:** set `includeSystemContext: false` to use tools without prompt injection
+- **Audit edicts regularly:** use `edicts review` (CLI or tool) to catch stale or suspicious entries
+
+**If you don't trust runtime mutation, don't enable it.** The safest configuration is `tools.enabled: false` with `autoSave: false` — edicts are injected from your curated file, and nothing can modify them at runtime. Enable write tools only when you want agents to establish persistent facts (e.g., learning user preferences, recording decisions).
+
 ## Contributing
 
 PRs are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md) before sending changes.
