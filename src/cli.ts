@@ -5,7 +5,7 @@ import { resolve, dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { EdictStore } from './store.js';
-import type { Edict, EdictFileSchema, EdictInput, ReviewResult } from './types.js';
+import type { Edict, EdictFileSchema, EdictInput, ReviewResult, CompactionGroup } from './types.js';
 import { renderPlain } from './renderer.js';
 import { EdictNotFoundError } from './errors.js';
 
@@ -19,7 +19,7 @@ function hasFlag(args: string[], name: string): boolean {
   return args.includes(name);
 }
 
-const BOOLEAN_FLAGS = new Set(['--json', '--plain', '--include-permanent', '--replace', '--merge']);
+const BOOLEAN_FLAGS = new Set(['--json', '--plain', '--include-permanent', '--replace', '--merge', '--dry-run']);
 
 function takePositional(args: string[]): string[] {
   const positionals: string[] = [];
@@ -49,6 +49,7 @@ function usage(): string {
     '  update <id> [--text TEXT] [--category CAT] [--tags TAGS] [--confidence CONF] [--ttl TTL] [--key KEY] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION]',
     '  search <query> [--json]',
     '  review [--stale-days N] [--include-permanent] [--json]',
+    '  compact <id>... --text TEXT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--source SRC] [--dry-run]',
     '  export [--format json|yaml] [--output FILE]',
     '  import <file> [--merge|--replace]',
     '  init [--path FILE]  Create a starter edicts.yaml in the current directory',
@@ -326,6 +327,65 @@ async function main(): Promise<void> {
       } else {
         process.stdout.write(printReviewPlain(review));
       }
+      break;
+    }
+    case 'compact': {
+      // edicts compact <id>... --text TEXT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--source SRC] [--dry-run]
+      // Merges the specified edicts into a single replacement edict.
+      // All specified edicts must share the same category and key prefix.
+      const ids = positional.slice(1);
+      if (ids.length < 2) {
+        throw new Error(`compact requires at least 2 edict IDs to merge\n${usage()}`);
+      }
+      const mergedText = takeFlag(args, '--text');
+      if (!mergedText) {
+        throw new Error(`compact requires --text TEXT for the merged edict\n${usage()}`);
+      }
+      const dryRun = hasFlag(args, '--dry-run');
+
+      // Resolve edicts by id
+      const allEdicts = await store.all();
+      const toCompact: Edict[] = [];
+      for (const id of ids) {
+        const found = allEdicts.find((e) => e.id === id);
+        if (!found) throw new EdictNotFoundError(id);
+        toCompact.push(found);
+      }
+
+      // Validate same category and key prefix
+      const categories = new Set(toCompact.map((e) => e.category));
+      if (categories.size > 1) {
+        throw new Error(`compact: all edicts must share the same category, got: ${[...categories].join(', ')}`);
+      }
+      const category = toCompact[0].category;
+      const keys = toCompact.map((e) => e.key).filter(Boolean);
+      if (keys.length > 0 && keys.length !== toCompact.length) {
+        throw new Error(`compact: all edicts must either all have keys or all be keyless`);
+      }
+
+      // Build merged input — inherit category, allow overrides via flags
+      const mergedInput: EdictInput = {
+        text: mergedText,
+        category,
+        key: toCompact[0].key ?? undefined,
+        tags: parseTags(takeFlag(args, '--tags')) ?? [...new Set(toCompact.flatMap((e) => e.tags ?? []))],
+        confidence: parseConfidence(takeFlag(args, '--confidence')) ?? toCompact[0].confidence,
+        ttl: parseTtl(takeFlag(args, '--ttl')) ?? toCompact[0].ttl,
+        source: takeFlag(args, '--source') ?? toCompact[0].source,
+        expiresAt: takeFlag(args, '--expiresAt'),
+        expiresIn: takeFlag(args, '--expiresIn'),
+      };
+
+      const group: CompactionGroup = { keyPrefix: toCompact[0].key ?? toCompact[0].id, category, edicts: toCompact };
+
+      if (dryRun) {
+        process.stdout.write(`DRY RUN — would compact ${ids.join(', ')} into:\n`);
+        process.stdout.write(`${JSON.stringify(mergedInput, null, 2)}\n`);
+        break;
+      }
+
+      const result = await store.compact(group, mergedInput);
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       break;
     }
     case 'export': {
