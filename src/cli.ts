@@ -49,7 +49,7 @@ function usage(): string {
     '  update <id> [--text TEXT] [--category CAT] [--tags TAGS] [--confidence CONF] [--ttl TTL] [--key KEY] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION]',
     '  search <query> [--json]',
     '  review [--stale-days N] [--include-permanent] [--json]',
-    '  compact <id>... --text TEXT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--source SRC] [--dry-run]',
+    '  compact <id>... --text TEXT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION] [--dry-run]',
     '  export [--format json|yaml] [--output FILE]',
     '  import <file> [--merge|--replace]',
     '  init [--path FILE]  Create a starter edicts.yaml in the current directory',
@@ -95,6 +95,18 @@ function parseTtl(value: string | undefined): Edict['ttl'] | undefined {
 
 function parseTags(value: string | undefined): string[] | undefined {
   return value?.split(',').map((v) => v.trim()).filter(Boolean);
+}
+
+function keyPrefix(key: string): string {
+  for (const separator of ['/', '.']) {
+    if (key.includes(separator)) {
+      const parts = key.split(separator);
+      if (parts.length > 1) {
+        return parts.slice(0, -1).join(separator);
+      }
+    }
+  }
+  return key;
 }
 
 function buildInput(args: string[]): EdictInput {
@@ -330,7 +342,7 @@ async function main(): Promise<void> {
       break;
     }
     case 'compact': {
-      // edicts compact <id>... --text TEXT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--source SRC] [--dry-run]
+      // edicts compact <id>... --text TEXT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION] [--dry-run]
       // Merges the specified edicts into a single replacement edict.
       // All specified edicts must share the same category and key prefix.
       const ids = positional.slice(1);
@@ -361,6 +373,12 @@ async function main(): Promise<void> {
       const keys = toCompact.map((e) => e.key).filter(Boolean);
       if (keys.length > 0 && keys.length !== toCompact.length) {
         throw new Error(`compact: all edicts must either all have keys or all be keyless`);
+      }
+      if (keys.length === toCompact.length) {
+        const keyPrefixes = new Set(keys.map((key) => keyPrefix(key)));
+        if (keyPrefixes.size > 1) {
+          throw new Error(`compact: all keyed edicts must share the same key prefix, got: ${[...keyPrefixes].join(', ')}`);
+        }
       }
 
       // Build merged input — inherit category, allow overrides via flags

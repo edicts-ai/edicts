@@ -481,4 +481,32 @@ describe('edicts CLI', () => {
       stderr: expect.stringContaining('same category'),
     });
   });
+
+  it('compact exits 1 when keyed edicts do not share a key prefix', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const r1 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Launch fact', '--category', 'product', '--key', 'launch-date/v1'], { cwd: process.cwd() });
+    const r2 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Pricing fact', '--category', 'product', '--key', 'pricing/v2'], { cwd: process.cwd() });
+    const id1 = JSON.parse(r1.stdout).edict.id as string;
+    const id2 = JSON.parse(r2.stdout).edict.id as string;
+
+    await expect(execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'compact', id1, id2, '--text', 'Invalid merge'], { cwd: process.cwd() })).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining('same key prefix'),
+    });
+  });
+
+  it('compact accepts keyed edicts that share a key prefix', async () => {
+    const path = join(tempDir, 'cli-edicts.yaml');
+    const r1 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Launch v1', '--category', 'product', '--key', 'launch-date/v1'], { cwd: process.cwd() });
+    const r2 = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'add', '--text', 'Launch v2', '--category', 'product', '--key', 'launch-date/v2'], { cwd: process.cwd() });
+    const id1 = JSON.parse(r1.stdout).edict.id as string;
+    const id2 = JSON.parse(r2.stdout).edict.id as string;
+
+    const result = await execFile('npx', ['tsx', 'src/cli.ts', '--path', path, 'compact', id1, id2, '--text', 'Launch merged'], { cwd: process.cwd() });
+    const compacted = JSON.parse(result.stdout);
+
+    expect(compacted.action).toBe('created');
+    expect(compacted.edict.key).toBe('launch-date/v1');
+    expect(compacted.edict.text).toBe('Launch merged');
+  });
 });
