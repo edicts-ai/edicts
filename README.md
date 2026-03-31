@@ -142,7 +142,6 @@ edicts update <id> --text "..."      # Update an edict
 edicts search <query>                # Search by text
 edicts stats                         # Store statistics
 edicts review                        # Health check (stale, expiring)
-edicts compact <id> <id> --text "…"  # Merge 2+ edicts into one (--dry-run to preview)
 edicts export --output backup.yaml   # Export store
 edicts import backup.yaml            # Import from file
 ```
