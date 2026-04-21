@@ -19,7 +19,7 @@ function hasFlag(args: string[], name: string): boolean {
   return args.includes(name);
 }
 
-const BOOLEAN_FLAGS = new Set(['--json', '--plain', '--include-permanent', '--replace', '--merge', '--dry-run']);
+const BOOLEAN_FLAGS = new Set(['--json', '--plain', '--verbose', '--include-permanent', '--replace', '--merge', '--dry-run']);
 
 function takePositional(args: string[]): string[] {
   const positionals: string[] = [];
@@ -42,7 +42,7 @@ function usage(): string {
     '',
     'Commands:',
     '  add --text TEXT --category CAT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--key KEY] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION]',
-    '  list [--json]',
+    '  list [--json] [--verbose]',
     '  stats',
     '  get <id> [--plain|--json]',
     '  remove <id>',
@@ -273,6 +273,21 @@ async function main(): Promise<void> {
     case 'list': {
       if (hasFlag(args, '--json')) {
         process.stdout.write(`${await store.render('json')}\n`);
+      } else if (hasFlag(args, '--verbose')) {
+        const edicts = await store.all();
+        if (edicts.length === 0) {
+          process.stdout.write('No edicts found.\n');
+        } else {
+          const lines: string[] = [];
+          for (const edict of edicts) {
+            lines.push(`[${edict.id}] ${edict.text}`);
+            lines.push(`  category: ${edict.category}  confidence: ${edict.confidence}  ttl: ${edict.ttl}`);
+            if (edict.source) lines.push(`  source: ${edict.source}`);
+            if (edict.expiresAt) lines.push(`  expiresAt: ${edict.expiresAt}`);
+            if (edict.tags && edict.tags.length > 0) lines.push(`  tags: ${edict.tags.join(', ')}`);
+          }
+          process.stdout.write(`${lines.join('\n')}\n`);
+        }
       } else {
         process.stdout.write(`${await store.render('plain')}\n`);
       }
@@ -375,7 +390,7 @@ async function main(): Promise<void> {
         throw new Error(`compact: all edicts must either all have keys or all be keyless`);
       }
       if (keys.length === toCompact.length) {
-        const keyPrefixes = new Set(keys.map((key) => keyPrefix(key)));
+        const keyPrefixes = new Set(keys.map((key) => keyPrefix(key as string)));
         if (keyPrefixes.size > 1) {
           throw new Error(`compact: all keyed edicts must share the same key prefix, got: ${[...keyPrefixes].join(', ')}`);
         }
