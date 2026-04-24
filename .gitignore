@@ -3,6 +3,8 @@ dist/
 coverage/
 *.log
 *.tmp
+*.tgz
+client-tutorial-validation.latest.json
 website/node_modules/
 website/dist/
 website/.astro/

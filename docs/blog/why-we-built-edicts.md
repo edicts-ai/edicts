@@ -180,8 +180,8 @@ If you are not on OpenClaw, install the standalone library:
 
 ```bash
 npm install edicts
-edicts init        # creates starter edicts.yaml
-edicts add "Feature X does NOT support gas sponsorship" --category product
+edicts init        # creates starter edicts.yaml with a placeholder e_001 edict
+edicts update e_001 --text "Feature X does NOT support gas sponsorship" --category product
 edicts list
 ```
 

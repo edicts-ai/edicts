@@ -29,6 +29,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
+    "validate:client-tutorials": "node scripts/validate-client-tutorials.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

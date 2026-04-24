@@ -23,7 +23,8 @@ Create an edicts file:
 
 ```bash
 npx edicts init
-# Creates ./edicts.yaml with a starter template
+# Creates ./edicts.yaml with a starter template and placeholder e_001 edict
+npx edicts update e_001 --text "Product v2.0 launches April 15, NOT before." --category product
 ```
 
 Or write one manually:
@@ -148,6 +149,16 @@ edicts import backup.yaml            # Import from file
 ```
 
 Full [CLI reference](https://edicts.ai/docs/reference/cli/).
+
+## Client tutorial validation
+
+Before publishing client-specific tutorials, run the repeatable validation suite and attach the results to the publication decision:
+
+```bash
+npm run validate:client-tutorials
+```
+
+The current pre-publication matrix covers Claude Code, Codex CLI, and Cursor flows. See [`docs/integrations/client-validation-matrix.md`](./docs/integrations/client-validation-matrix.md) and the latest smoke results in [`docs/integrations/client-smoke-results-2026-04-24.md`](./docs/integrations/client-smoke-results-2026-04-24.md).
 
 ## OpenClaw integration
 
