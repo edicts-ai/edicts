@@ -8,6 +8,7 @@ import { EdictStore } from './store.js';
 import type { Edict, EdictFileSchema, EdictInput, ReviewResult, CompactionGroup } from './types.js';
 import { renderPlain } from './renderer.js';
 import { EdictNotFoundError } from './errors.js';
+import { validateEdictInput, validateFileSchema } from './schema.js';
 
 function takeFlag(args: string[], name: string): string | undefined {
   const idx = args.indexOf(name);
@@ -52,6 +53,7 @@ function usage(): string {
     '  compact <id>... --text TEXT [--tags TAGS] [--confidence CONF] [--ttl TTL] [--source SRC] [--expiresAt DATE] [--expiresIn DURATION] [--dry-run]',
     '  export [--format json|yaml] [--output FILE]',
     '  import <file> [--merge|--replace]',
+    '  validate [--path FILE]  Validate edicts file and report errors (exit 1 if invalid)',
     '  init [--path FILE]  Create a starter edicts.yaml in the current directory',
     '  version             Print version',
   ].join('\n');
@@ -453,6 +455,68 @@ async function main(): Promise<void> {
 
       const result = await store.importData(data);
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      break;
+    }
+    case 'validate': {
+      // Validate the edicts file — checks schema and each edict's fields.
+      // Exits with code 1 if any errors found (CI-friendly).
+      const validatePath = explicitPath ?? findEdictsFile(process.cwd());
+      if (!validatePath) {
+        process.stderr.write(`No edicts file found (searched from ${process.cwd()} to /)\nRun 'edicts init' to create one, or use --path to specify a location.\n`);
+        process.exitCode = 1;
+        break;
+      }
+      let rawContent: string;
+      try {
+        rawContent = await readFile(validatePath, 'utf8');
+      } catch {
+        process.stderr.write(`Cannot read file: ${validatePath}\n`);
+        process.exitCode = 1;
+        break;
+      }
+      let parsed: unknown;
+      try {
+        parsed = validatePath.endsWith('.json')
+          ? JSON.parse(rawContent)
+          : (await import('yaml')).parse(rawContent);
+      } catch (e) {
+        process.stderr.write(`Parse error in ${validatePath}: ${e instanceof Error ? e.message : String(e)}\n`);
+        process.exitCode = 1;
+        break;
+      }
+      const errors: string[] = [];
+      try {
+        const warnings = validateFileSchema(parsed as Parameters<typeof validateFileSchema>[0]);
+        for (const w of warnings) errors.push(`warning: ${w}`);
+      } catch (e) {
+        errors.push(`error: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      // Validate each edict's input fields
+      const schema = parsed as { edicts?: unknown[] };
+      if (Array.isArray(schema.edicts)) {
+        for (const edict of schema.edicts) {
+          const e = edict as Record<string, unknown>;
+          try {
+            validateEdictInput({
+              text: (e.text as string) ?? '',
+              category: (e.category as string) ?? '',
+              confidence: e.confidence as Edict['confidence'] | undefined,
+              ttl: e.ttl as Edict['ttl'] | undefined,
+              expiresAt: e.expiresAt as string | undefined,
+            });
+          } catch (err) {
+            errors.push(`error [${e.id ?? '(unknown)'}]: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+      }
+      if (errors.length === 0) {
+        process.stdout.write(`All edicts valid (${(schema.edicts ?? []).length} edicts in ${validatePath})\n`);
+      } else {
+        for (const msg of errors) {
+          process.stderr.write(`${msg}\n`);
+        }
+        process.exitCode = 1;
+      }
       break;
     }
     case undefined:
