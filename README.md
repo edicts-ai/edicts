@@ -146,9 +146,43 @@ edicts review                        # Health check (stale, expiring)
 edicts compact <id> <id> --text "…"  # Merge 2+ edicts into one (--dry-run to preview)
 edicts export --output backup.yaml   # Export store
 edicts import backup.yaml            # Import from file
+edicts validate                      # Validate edicts file (exits 1 if invalid — CI-safe)
+edicts validate --path /path/to/edicts.yaml  # Validate a specific file
 ```
 
 Full [CLI reference](https://edicts.ai/docs/reference/cli/).
+
+## CI/CD integration
+
+Use `edicts validate` as a PR gate to catch broken edicts files before they reach production.
+
+### GitHub Action
+
+```yaml
+# .github/workflows/validate-edicts.yml
+name: Validate Edicts
+on:
+  push:
+    paths: [edicts.yaml, edicts.json]
+  pull_request:
+    paths: [edicts.yaml, edicts.json]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: edicts-ai/edicts@v1
+```
+
+[![Validate Edicts](https://github.com/edicts-ai/edicts/actions/workflows/ci.yml/badge.svg)](https://github.com/edicts-ai/edicts/actions)
+
+### Shell / custom CI
+
+```bash
+npx edicts validate            # auto-discovers edicts.yaml
+npx edicts validate --path edicts.yaml
+echo $?  # 0 = valid, 1 = errors found
+```
 
 ## Client tutorial validation
 

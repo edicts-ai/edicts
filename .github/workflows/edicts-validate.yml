@@ -1,0 +1,20 @@
+name: Validate Edicts
+
+on:
+  push:
+    paths:
+      - 'edicts.yaml'
+      - 'edicts.json'
+  pull_request:
+    paths:
+      - 'edicts.yaml'
+      - 'edicts.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: edicts-ai/edicts@v1
+        with:
+          path: edicts.yaml   # optional — omit to auto-discover
