@@ -1,0 +1,50 @@
+# edicts.yaml — Standing orders for the edicts project itself.
+# This file dogfoods the edicts library and serves as a CI/CD validation example.
+# It is validated on every PR via the edicts GitHub Action.
+version: 1
+config:
+  maxEdicts: 200
+  tokenBudget: 4000
+  categories: []
+edicts:
+  - id: edicts-ci-validate-on-pr
+    text: All pull requests must pass edicts validate before merge. Use the edicts GitHub Action in CI.
+    category: rules
+    tags: [ci, quality, development]
+    confidence: verified
+    source: manual
+    ttl: permanent
+    created: "2026-05-04T18:26:59.000Z"
+    updated: "2026-05-04T18:26:59.000Z"
+
+  - id: edicts-semver-releases
+    text: edicts uses semantic versioning. Patch for bug fixes, minor for new features, major for breaking changes.
+    category: rules
+    tags: [versioning, release]
+    confidence: verified
+    source: manual
+    ttl: permanent
+    created: "2026-05-04T18:26:59.000Z"
+    updated: "2026-05-04T18:26:59.000Z"
+
+  - id: edicts-no-breaking-cli-changes
+    text: The edicts CLI interface (command names, flags, exit codes) must not change in patch or minor releases. Breaking CLI changes require a major version bump.
+    category: rules
+    tags: [cli, compatibility]
+    confidence: verified
+    source: manual
+    ttl: permanent
+    created: "2026-05-04T18:26:59.000Z"
+    updated: "2026-05-04T18:26:59.000Z"
+
+  - id: edicts-typescript-strict
+    text: The edicts codebase uses TypeScript strict mode. All new code must pass tsc --noEmit before commit.
+    category: rules
+    tags: [typescript, quality]
+    confidence: verified
+    source: manual
+    ttl: permanent
+    created: "2026-05-04T18:26:59.000Z"
+    updated: "2026-05-04T18:26:59.000Z"
+
+history: []
