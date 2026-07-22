@@ -58,5 +58,8 @@
     "type": "git",
     "url": "https://github.com/edicts-ai/edicts.git"
   },
-  "homepage": "https://edicts.ai"
+  "homepage": "https://edicts.ai",
+  "overrides": {
+    "esbuild": "^0.28.1"
+  }
 }
